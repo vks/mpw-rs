@@ -1,0 +1,12 @@
+[package]
+name = "mpw"
+version = "0.0.1"
+authors = ["Vinzent Steinberg <Vinzent.Steinberg@gmail.com>"]
+
+[dependencies]
+rust-crypto = "0.2"
+lazy_static = "0.2"
+byteorder = "0.5"
+
+[profile.dev]
+opt-level = 2  # otherwise the tests run for too long

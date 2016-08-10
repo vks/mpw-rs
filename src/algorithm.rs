@@ -2,11 +2,13 @@ extern crate crypto;
 extern crate byteorder;
 
 use std::io::{Read, Write};
-use std::convert::TryInto;
+use std::convert::{TryInto, TryFrom};
 
 use self::crypto::scrypt::{scrypt, ScryptParams};
 use self::crypto::digest::Digest;
 use self::crypto::sha2::Sha256;
+use self::crypto::hmac::Hmac;
+use self::crypto::mac::Mac;
 use self::byteorder::{BigEndian, WriteBytesExt};
 
 lazy_static! {
@@ -59,6 +61,38 @@ pub fn id_for_buf(buf: &[u8]) -> String {
     hex
 }
 
+/// Encode a visual fingerprint for a user.
+pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
+   let left_arm = [ "╔", "╚", "╰", "═" ];
+   let right_arm = [ "╗", "╝", "╯", "═" ];
+   let body = [ "█", "░", "▒", "▓", "☺", "☻" ];
+   let accessory = [
+       "◈", "◎", "◐", "◑", "◒", "◓", "☀", "☁", "☂", "☃", "☄", "★", "☆", "☎",
+       "☏", "⎈", "⌂", "☘", "☢", "☣", "☕", "⌚", "⌛", "⏰", "⚡", "⛄", "⛅", "☔",
+       "♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟", "♨", "♩",
+       "♪", "♫", "⚐", "⚑", "⚔", "⚖", "⚙", "⚠", "⌘", "⏎", "✄", "✆", "✈", "✉", "✌"
+   ];
+
+   let mut hasher = Sha256::new();
+   let mut hmacer = Hmac::new(hasher, master_password);
+   hmacer.input(full_name);
+
+   let mut identicon_seed = [0; 32];
+   hmacer.raw_result(&mut identicon_seed);
+
+   // TODO color
+
+   let get_part = |set: &[&'static str], seed: u8| {
+       set[usize::from(seed % u8::try_from(set.len()).unwrap())]
+   };
+   let mut identicon = String::with_capacity(256);
+   identicon.push_str(get_part(&left_arm[..], identicon_seed[0]));
+   identicon.push_str(get_part(&body[..], identicon_seed[1]));
+   identicon.push_str(get_part(&right_arm[..], identicon_seed[2]));
+   identicon.push_str(get_part(&accessory[..], identicon_seed[3]));
+   identicon
+}
+
 #[test]
 fn test_key_for_user_v3() {
     let full_name = "John Doe";
@@ -67,9 +101,24 @@ fn test_key_for_user_v3() {
         full_name.as_bytes(),
         master_password.as_bytes()
     );
-    let expected_master_key: [u8; 64] = [27, 177, 181, 88, 106, 115, 177, 174, 150, 213, 214, 9,
-    53, 44, 141, 132, 20, 254, 89, 228, 224, 58, 95, 52, 226, 174, 130, 64, 244, 84, 216, 6, 136,
-    210, 95, 208, 201, 115, 81, 48, 112, 177, 183, 129, 50, 44, 115, 10, 86, 114, 44, 225, 160,
-    170, 250, 210, 194, 87, 12, 220, 20, 36, 120, 232];
+    let expected_master_key: [u8; 64] = [
+        27, 177, 181, 88, 106, 115, 177, 174, 150, 213, 214, 9, 53, 44, 141,
+        132, 20, 254, 89, 228, 224, 58, 95, 52, 226, 174, 130, 64, 244, 84, 216,
+        6, 136, 210, 95, 208, 201, 115, 81, 48, 112, 177, 183, 129, 50, 44, 115,
+        10, 86, 114, 44, 225, 160, 170, 250, 210, 194, 87, 12, 220, 20, 36, 120,
+        232
+    ];
     assert_eq!(&master_key[..], &expected_master_key[..]);
+}
+
+#[test]
+fn test_identicon() {
+    let full_name = "John Doe";
+    let master_password = "password";
+    let master_key = master_key_for_user_v3(
+        full_name.as_bytes(),
+        master_password.as_bytes()
+    );
+    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
+    assert_eq!(identicon, "╔░╝⌚");
 }

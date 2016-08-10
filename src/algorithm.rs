@@ -36,7 +36,7 @@ fn scope_for_variant(variant: SiteVariant) -> &'static str {
 }
 
 /// Derive a master key from a full name and a master password.
-pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Vec<u8> {
+pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> [u8; 64] {
     let mut master_key_salt = Vec::new();
     master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes());
     let master_key_salt_len = full_name.len().try_into().unwrap();
@@ -46,7 +46,7 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Vec<u
     assert!(!master_key_salt.is_empty());
     println!("master key salt: {}", id_for_buf(&master_key_salt));
 
-    let mut master_key = vec![0; 64];
+    let mut master_key = [0; 64];
     scrypt(master_password, &master_key_salt, &scrypt_params, &mut master_key);
     println!("master key: {}", id_for_buf(&master_key));
 

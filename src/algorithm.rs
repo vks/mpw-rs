@@ -13,6 +13,7 @@ lazy_static! {
     static ref scrypt_params: ScryptParams = ScryptParams::new(15, 8, 2);
 }
 
+/// Represent which variant of password to generate.
 #[derive(Clone, Copy)]
 enum SiteVariant {
     /// Generate the password to login with.
@@ -23,6 +24,7 @@ enum SiteVariant {
     Answer,
 }
 
+/// Represent a password variant as a string.
 fn scope_for_variant(variant: SiteVariant) -> &'static str {
     match variant {
         SiteVariant::Password => "com.lyndir.masterpassword",
@@ -31,6 +33,7 @@ fn scope_for_variant(variant: SiteVariant) -> &'static str {
     }
 }
 
+/// Derive a master key from a full name and a master password.
 pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Vec<u8> {
     let mut master_key_salt = Vec::new();
     master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes());
@@ -48,6 +51,7 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Vec<u
     master_key
 }
 
+/// Calculate a hex-encoded ID using SHA256.
 pub fn id_for_buf(buf: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.input(buf);

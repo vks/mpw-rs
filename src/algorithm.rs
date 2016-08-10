@@ -51,7 +51,7 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Vec<u
     master_key
 }
 
-/// Calculate a hex-encoded ID using SHA256.
+/// Encode a fingerprint for a buffer.
 pub fn id_for_buf(buf: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.input(buf);
@@ -71,5 +71,5 @@ fn test_key_for_user_v3() {
     53, 44, 141, 132, 20, 254, 89, 228, 224, 58, 95, 52, 226, 174, 130, 64, 244, 84, 216, 6, 136,
     210, 95, 208, 201, 115, 81, 48, 112, 177, 183, 129, 50, 44, 115, 10, 86, 114, 44, 225, 160,
     170, 250, 210, 194, 87, 12, 220, 20, 36, 120, 232];
-    assert_eq!(&master_key[..], &expected_master_key as &[u8]);
+    assert_eq!(&master_key[..], &expected_master_key[..]);
 }

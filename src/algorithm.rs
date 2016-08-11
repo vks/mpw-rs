@@ -144,7 +144,7 @@ fn templates_for_type(ty: SiteType) -> Vec<&'static str> {
 fn template_for_type(ty: SiteType, seed_byte: u8) -> &'static str {
     let templates = templates_for_type(ty);
     let count = u8::try_from(templates.len()).unwrap();
-    return templates[usize::from(seed_byte % count)];
+    templates[usize::from(seed_byte % count)]
 }
 
 /// Return an internal string that contains all the characters occuring in the given class.

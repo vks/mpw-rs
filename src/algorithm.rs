@@ -12,7 +12,7 @@ use self::crypto::mac::Mac;
 use self::byteorder::{BigEndian, WriteBytesExt};
 
 lazy_static! {
-    static ref scrypt_params: ScryptParams = ScryptParams::new(15, 8, 2);
+    static ref SCRYPT_PARAMS: ScryptParams = ScryptParams::new(15, 8, 2);
 }
 
 /// Represent which variant of password to generate.
@@ -52,15 +52,14 @@ fn scope_for_variant(variant: SiteVariant) -> &'static str {
 /// Derive a master key from a full name and a master password.
 pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> [u8; 64] {
     let mut master_key_salt = Vec::new();
-    master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes());
+    master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes()).unwrap();
     let master_key_salt_len = full_name.len().try_into().unwrap();
-    // TODO little or big endian?
     master_key_salt.write_u32::<BigEndian>(master_key_salt_len).unwrap();
     master_key_salt.write_all(full_name).unwrap();
     assert!(!master_key_salt.is_empty());
 
     let mut master_key = [0; 64];
-    scrypt(master_password, &master_key_salt, &scrypt_params, &mut master_key);
+    scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut master_key);
 
     master_key
 }
@@ -71,12 +70,12 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
     let site_scope = scope_for_variant(site_variant).as_bytes();
     site_password_salt.write_all(site_scope).unwrap();
     let site_name_len = site_name.len().try_into().unwrap();
-    site_password_salt.write_u32::<BigEndian>(site_name_len);
+    site_password_salt.write_u32::<BigEndian>(site_name_len).unwrap();
     site_password_salt.write_all(site_name).unwrap();
-    site_password_salt.write_u32::<BigEndian>(site_counter);
+    site_password_salt.write_u32::<BigEndian>(site_counter).unwrap();
     if !site_context.is_empty() {
         let site_context_len = site_context.len().try_into().unwrap();
-        site_password_salt.write_u32::<BigEndian>(site_context_len);
+        site_password_salt.write_u32::<BigEndian>(site_context_len).unwrap();
         site_password_salt.write_all(site_context).unwrap();
     }
     assert!(!site_password_salt.is_empty());
@@ -202,12 +201,11 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
         "♪", "♫", "⚐", "⚑", "⚔", "⚖", "⚙", "⚠", "⌘", "⏎", "✄", "✆", "✈", "✉", "✌"
     ];
 
-    let mut hasher = Sha256::new();
-    let mut hmacer = Hmac::new(hasher, master_password);
-    hmacer.input(full_name);
+    let mut hmac = Hmac::new(Sha256::new(), master_password);
+    hmac.input(full_name);
 
     let mut identicon_seed = [0; 32];
-    hmacer.raw_result(&mut identicon_seed);
+    hmac.raw_result(&mut identicon_seed);
 
     // TODO color
 
@@ -260,10 +258,8 @@ fn test_password_for_site_v3() {
 fn test_identicon() {
     let full_name = "John Doe";
     let master_password = "password";
-    let master_key = master_key_for_user_v3(
-        full_name.as_bytes(),
-        master_password.as_bytes()
-    );
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     assert_eq!(identicon, "╔░╝⌚");
 }
+
+// TODO make sure unicode strings work

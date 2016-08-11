@@ -58,11 +58,9 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> [u8; 
     master_key_salt.write_u32::<BigEndian>(master_key_salt_len).unwrap();
     master_key_salt.write_all(full_name).unwrap();
     assert!(!master_key_salt.is_empty());
-    println!("master key salt: {}", id_for_buf(&master_key_salt));
 
     let mut master_key = [0; 64];
     scrypt(master_password, &master_key_salt, &scrypt_params, &mut master_key);
-    println!("master key: {}", id_for_buf(&master_key));
 
     master_key
 }
@@ -82,17 +80,14 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
         site_password_salt.write_all(site_context).unwrap();
     }
     assert!(!site_password_salt.is_empty());
-    println!("site password salt: {}", id_for_buf(&site_password_salt));
 
     let mut hmac = Hmac::new(Sha256::new(), master_key);
     hmac.input(&site_password_salt);
     let mut site_password_seed = [0u8; 32];
     hmac.raw_result(&mut site_password_seed);
     assert!(!site_password_seed.is_empty());
-    println!("site password seed: {}", id_for_buf(&site_password_seed));
 
     let template = template_for_type(site_type, site_password_seed[0]);
-    println!("template: {}", template);
     if template.len() > 32 {
         panic!("Template to long for password seed");
     }

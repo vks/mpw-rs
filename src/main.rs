@@ -63,4 +63,5 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
+    let full_name = matches.value_of("full name").unwrap_or("");
 }

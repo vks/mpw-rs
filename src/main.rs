@@ -71,7 +71,7 @@ fn main() {
 
     let full_name = matches.value_of("full name").unwrap_or("");
 
-    let ty = matches.value_of("type").map(|s| match s {
+    let site_type = matches.value_of("type").map(|s| match s {
         "x" | "max" | "maximum"
             => SiteType::GeneratedMaximum,
         "l" | "long"
@@ -107,7 +107,15 @@ fn main() {
 
     let context = matches.value_of("context").unwrap_or("");
 
-    print!("Please enter the password: ");
+    print!("Please enter the master password: ");
     std::io::stdout().flush().unwrap();
     let password = read_password().expect("could not read password");
+
+    let identicon = identicon(full_name.as_bytes(), password.as_bytes());
+    println!("Identicon: {}", identicon);
+    let master_key = master_key_for_user_v3(full_name.as_bytes(), password.as_bytes());
+    let sitename = "";
+    let generated_password = password_for_site_v3(
+        &master_key, sitename.as_bytes(), site_type, counter, variant, context.as_bytes());
+    println!("Derived password: {}", generated_password);
 }

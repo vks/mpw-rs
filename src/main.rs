@@ -2,10 +2,13 @@
 
 #[macro_use]
 extern crate lazy_static;
-
 extern crate clap;
+extern crate rpassword;
+
+use std::io::Write;
 
 use clap::{Arg, App};
+use rpassword::read_password;
 
 mod algorithm;
 use algorithm::*;
@@ -34,6 +37,7 @@ fn main() {
              .help(TYPE_HELP)
              .next_line_help(true)
              .takes_value(true)
+             .number_of_values(1)
              .possible_values(&[
                  "x", "max", "maximum",
                  "l", "long",
@@ -47,11 +51,13 @@ fn main() {
         .arg(Arg::with_name("counter")
              .short("c")
              .help("The value of the site counter")
-             .takes_value(true))
+             .takes_value(true)
+             .number_of_values(1))
         .arg(Arg::with_name("variant")
              .short("v")
              .help("The kind of content to generate")
              .takes_value(true)
+             .number_of_values(1)
              .possible_values(&[
                 "p", "password",
                 "l", "login",
@@ -64,4 +70,44 @@ fn main() {
         .get_matches();
 
     let full_name = matches.value_of("full name").unwrap_or("");
+
+    let ty = matches.value_of("type").map(|s| match s {
+        "x" | "max" | "maximum"
+            => SiteType::GeneratedMaximum,
+        "l" | "long"
+            => SiteType::GeneratedLong,
+        "m" | "med" | "medium"
+            => SiteType::GeneratedMedium,
+        "b" | "basic"
+            => SiteType::GeneratedBasic,
+        "s" | "short"
+            => SiteType::GeneratedShort,
+        "i" | "pin"
+            => SiteType::GeneratedPIN,
+        "n" | "name"
+            => SiteType::GeneratedName,
+        "p" | "phrase"
+            => SiteType::GeneratedPhrase,
+        _ => panic!("invalid password type"),
+    }).unwrap_or(SiteType::GeneratedLong);
+
+    let counter: u32 = matches.value_of("counter")
+        .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer"))
+        .unwrap_or(1);
+
+    let variant = matches.value_of("variant").map(|s| match s {
+        "p" | "password"
+            => SiteVariant::Password,
+        "l" | "login"
+            => SiteVariant::Login,
+        "a" | "answer"
+            => SiteVariant::Answer,
+        _ => panic!("invalid site variant"),
+    }).unwrap_or(SiteVariant::Password);
+
+    let context = matches.value_of("context").unwrap_or("");
+
+    print!("Please enter the password: ");
+    std::io::stdout().flush().unwrap();
+    let password = read_password().expect("could not read password");
 }

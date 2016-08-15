@@ -7,10 +7,11 @@ authors = ["Vinzent Steinberg <Vinzent.Steinberg@gmail.com>"]
 rust-crypto = "0.2"
 lazy_static = "0.2"
 byteorder = "0.5"
+rpassword = "0.2"
 
 [dependencies.clap]
 version = "2"
-features = ["unstable", "color", "debug"]
+features = ["unstable", "color"]
 
 [profile.dev]
 opt-level = 2  # otherwise the tests run for too long

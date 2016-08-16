@@ -8,8 +8,12 @@ rust-crypto = "0.2"
 lazy_static = "0.2"
 byteorder = "0.5"
 rpassword = "0.2"
-toml = "0.2"
-rustc-serialize = "0.3"
+serde = "0.8"
+serde_macros = "0.8"
+
+[dependencies.toml]
+version = "0.2"
+features = ["serde"]
 
 [dependencies.clap]
 version = "2"

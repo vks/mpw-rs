@@ -86,9 +86,9 @@ name = "wikipedia.org"
 "#);
 
     let mut github = SiteConfig::new("github.com");
-    //github.type_ = Some(SiteType::GeneratedMaximum);
+    github.type_ = Some(SiteType::GeneratedMaximum);
     github.counter = Some(1);
-    //github.variant = Some(SiteVariant::Password);
+    github.variant = Some(SiteVariant::Password);
     github.context = Some("");
     let bitbucket = SiteConfig::new("bitbucket.org");
     c.sites = Some(vec![github, bitbucket]);
@@ -99,8 +99,26 @@ r#"full_name = "John Doe"
 context = ""
 counter = 1
 name = "github.com"
+type_ = "maximum"
+variant = "password"
 
 [[sites]]
 name = "bitbucket.org"
 "#);
+}
+
+#[test]
+fn test_variant_encode() {
+    #[derive(Debug, Serialize)]
+    struct V { variant: SiteVariant }
+    assert_eq!(toml::encode_str(&V { variant: SiteVariant::Password }),
+               "variant = \"password\"\n");
+}
+
+#[test]
+fn test_type_encode() {
+    #[derive(Debug, Serialize)]
+    struct T { type_: SiteType }
+    assert_eq!(toml::encode_str(&T { type_: SiteType::GeneratedLong }),
+               "type_ = \"long\"\n");
 }

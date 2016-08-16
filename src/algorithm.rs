@@ -1,5 +1,6 @@
 extern crate crypto;
 extern crate byteorder;
+extern crate serde;
 
 use std::io::{Read, Write};
 use std::convert::{TryInto, TryFrom};
@@ -18,7 +19,7 @@ lazy_static! {
 }
 
 /// Represent which variant of password to generate.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug)]
 pub enum SiteVariant {
     /// Generate the password to login with.
     Password,
@@ -28,7 +29,19 @@ pub enum SiteVariant {
     Answer,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+impl serde::Serialize for SiteVariant {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer 
+    {
+        serializer.serialize_str(match *self {
+            SiteVariant::Password => "password",
+            SiteVariant::Login => "login",
+            SiteVariant::Answer => "answer",
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum SiteType {
     GeneratedMaximum,
     GeneratedLong,
@@ -40,6 +53,24 @@ pub enum SiteType {
     GeneratedPhrase,
     StoredPersonal,
     StoredDevicePrivate,
+}
+
+impl serde::Serialize for SiteType {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_str(match *self {
+            SiteType::GeneratedMaximum => "maximum",
+            SiteType::GeneratedLong => "long",
+            SiteType::GeneratedMedium => "medium",
+            SiteType::GeneratedBasic => "basic",
+            SiteType::GeneratedShort => "short",
+            SiteType::GeneratedPIN => "pin",
+            SiteType::GeneratedName => "name",
+            SiteType::GeneratedPhrase => "phrase",
+            _ => unimplemented!(),
+        })
+    }
 }
 
 /// Represent a password variant as a string.

@@ -13,6 +13,7 @@ serde_macros = "0.8"
 
 [dependencies.toml]
 version = "0.2"
+default-features = false
 features = ["serde"]
 
 [dependencies.clap]

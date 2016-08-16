@@ -28,6 +28,11 @@ p, phrase         20 character sentence.";
 fn main() {
     let matches = App::new("Master Password")
         .about("A stateless password management solution.")
+        .arg(Arg::with_name("site name")
+             .help("The domain name of the site.")
+             .required(true)
+             .number_of_values(1)
+             .index(1))
         .arg(Arg::with_name("full name")
              .short("u")
              .help("The full name of the user")
@@ -68,6 +73,8 @@ fn main() {
              .help("Empty for a universal site or the most significant word(s) of the question")
              .takes_value(true))
         .get_matches();
+
+    let site_name = matches.value_of("site name").unwrap();
 
     let full_name = matches.value_of("full name").unwrap_or("");
 
@@ -114,8 +121,7 @@ fn main() {
     let identicon = identicon(full_name.as_bytes(), password.as_bytes());
     println!("Identicon: {}", identicon);
     let master_key = master_key_for_user_v3(full_name.as_bytes(), password.as_bytes());
-    let sitename = "";
     let generated_password = password_for_site_v3(
-        &master_key, sitename.as_bytes(), site_type, counter, variant, context.as_bytes());
-    println!("Derived password: {}", generated_password);
+        &master_key, site_name.as_bytes(), site_type, counter, variant, context.as_bytes());
+    println!("Password for {}: {}", site_name, generated_password);
 }

@@ -5,11 +5,17 @@ use std::ops::Deref;
 
 use self::crypto::util::secure_memset;
 
+/// A cheap, mutable reference-to-mutable reference conversion.
+///
+/// Because it is implemented for String as well, it is unsafe to call.
+/// (It allows violating memory safety by setting a non-UTF-8 string.)
 pub trait UnsafeAsMut {
     unsafe fn as_mut(&mut self) -> &mut [u8];
 }
 
-/*
+/* Ideally this should be used, but it conflicts with the implementation for String.
+ * Furthermore, AsMut is not implemented for [u8; 64].
+
 impl<T: AsMut<[u8]>> UnsafeAsMut for T {
     unsafe fn as_mut(&mut self) -> &mut [u8] {
         self.as_mut()
@@ -65,7 +71,7 @@ impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
 
 #[test]
 fn test_clear_on_drop_string() {
-    let s = "hello".to_string();
+    let s: String = "hello".to_string();
     let _ = ClearOnDrop::new(s);
 }
 

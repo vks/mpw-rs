@@ -4,7 +4,6 @@
 extern crate lazy_static;
 extern crate clap;
 extern crate rpassword;
-extern crate toml;
 
 use std::io::Write;
 

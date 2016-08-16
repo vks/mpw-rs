@@ -12,6 +12,7 @@ use rpassword::read_password;
 
 mod algorithm;
 use algorithm::*;
+mod clear_on_drop;
 
 static TYPE_HELP: &'static str =
 "The password's template (defaults to 'long' for password, 'name' for login)
@@ -123,5 +124,5 @@ fn main() {
     let master_key = master_key_for_user_v3(full_name.as_bytes(), password.as_bytes());
     let generated_password = password_for_site_v3(
         &master_key, site_name.as_bytes(), site_type, counter, variant, context.as_bytes());
-    println!("Password for {}: {}", site_name, generated_password);
+    println!("Password for {}: {}", site_name, *generated_password);
 }

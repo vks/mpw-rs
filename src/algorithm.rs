@@ -11,6 +11,8 @@ use self::crypto::hmac::Hmac;
 use self::crypto::mac::Mac;
 use self::byteorder::{BigEndian, WriteBytesExt};
 
+use clear_on_drop::ClearOnDrop;
+
 lazy_static! {
     static ref SCRYPT_PARAMS: ScryptParams = ScryptParams::new(15, 8, 2);
 }
@@ -50,7 +52,7 @@ fn scope_for_variant(variant: SiteVariant) -> &'static str {
 }
 
 /// Derive a master key from a full name and a master password.
-pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> [u8; 64] {
+pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> ClearOnDrop<[u8; 64]> {
     let mut master_key_salt = Vec::new();
     master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes()).unwrap();
     let master_key_salt_len = full_name.len().try_into().unwrap();
@@ -58,14 +60,14 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> [u8; 
     master_key_salt.write_all(full_name).unwrap();
     assert!(!master_key_salt.is_empty());
 
-    let mut master_key = [0; 64];
-    scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut master_key);
+    let mut master_key = ClearOnDrop::new([0; 64]);
+    scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut master_key.container);
 
     master_key
 }
 
 pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: SiteType,
-        site_counter: u32, site_variant: SiteVariant, site_context: &[u8]) -> String {
+        site_counter: u32, site_variant: SiteVariant, site_context: &[u8]) -> ClearOnDrop<String> {
     let mut site_password_salt = Vec::new();
     let site_scope = scope_for_variant(site_variant).as_bytes();
     site_password_salt.write_all(site_scope).unwrap();
@@ -92,10 +94,10 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
     }
 
     // Encode the password from the seed using the template.
-    let mut site_password = String::new();
+    let mut site_password = ClearOnDrop::new(String::new());
     for i in 0..template.len() {
         let c = template.chars().nth(i).unwrap();
-        site_password.push(
+        site_password.container.push(
             character_from_class(c, site_password_seed[i + 1])
         );
     }
@@ -251,7 +253,7 @@ fn test_password_for_site_v3() {
         &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
         SiteVariant::Password, &[]
     );
-    assert_eq!(password, "QubnJuvaMoke2~");
+    assert_eq!(*password, "QubnJuvaMoke2~");
 }
 
 #[test]

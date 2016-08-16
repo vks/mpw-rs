@@ -1,4 +1,5 @@
-#![feature(try_from)]
+#![feature(try_from, custom_derive, plugin)]
+#![plugin(serde_macros)]
 
 #[macro_use]
 extern crate lazy_static;

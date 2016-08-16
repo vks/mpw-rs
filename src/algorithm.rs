@@ -18,7 +18,7 @@ lazy_static! {
 }
 
 /// Represent which variant of password to generate.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum SiteVariant {
     /// Generate the password to login with.
     Password,
@@ -28,7 +28,7 @@ pub enum SiteVariant {
     Answer,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum SiteType {
     GeneratedMaximum,
     GeneratedLong,

@@ -13,6 +13,8 @@ use rpassword::read_password;
 mod algorithm;
 use algorithm::*;
 mod clear_on_drop;
+mod config;
+use config::*;
 
 static TYPE_HELP: &'static str =
 "The password's template (defaults to 'long' for password, 'name' for login)
@@ -75,54 +77,63 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
-    let site_name = matches.value_of("site name").unwrap();
+    let mut config = Config::new();
+    config.full_name = matches.value_of("full name");
 
-    let full_name = matches.value_of("full name").unwrap_or("");
-
-    let site_type = matches.value_of("type").map(|s| match s {
-        "x" | "max" | "maximum"
-            => SiteType::GeneratedMaximum,
-        "l" | "long"
-            => SiteType::GeneratedLong,
-        "m" | "med" | "medium"
-            => SiteType::GeneratedMedium,
-        "b" | "basic"
-            => SiteType::GeneratedBasic,
-        "s" | "short"
-            => SiteType::GeneratedShort,
-        "i" | "pin"
-            => SiteType::GeneratedPIN,
-        "n" | "name"
-            => SiteType::GeneratedName,
-        "p" | "phrase"
-            => SiteType::GeneratedPhrase,
-        _ => panic!("invalid password type"),
-    }).unwrap_or(SiteType::GeneratedLong);
-
-    let counter: u32 = matches.value_of("counter")
-        .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer"))
-        .unwrap_or(1);
-
-    let variant = matches.value_of("variant").map(|s| match s {
-        "p" | "password"
-            => SiteVariant::Password,
-        "l" | "login"
-            => SiteVariant::Login,
-        "a" | "answer"
-            => SiteVariant::Answer,
-        _ => panic!("invalid site variant"),
-    }).unwrap_or(SiteVariant::Password);
-
-    let context = matches.value_of("context").unwrap_or("");
+    let site_config = SiteConfig {
+        name: matches.value_of("site name").unwrap(),  // Is required, thus present.
+        type_: matches.value_of("type").map(|s| match s {
+            "x" | "max" | "maximum"
+                => SiteType::GeneratedMaximum,
+            "l" | "long"
+                => SiteType::GeneratedLong,
+            "m" | "med" | "medium"
+                => SiteType::GeneratedMedium,
+            "b" | "basic"
+                => SiteType::GeneratedBasic,
+            "s" | "short"
+                => SiteType::GeneratedShort,
+            "i" | "pin"
+                => SiteType::GeneratedPIN,
+            "n" | "name"
+                => SiteType::GeneratedName,
+            "p" | "phrase"
+                => SiteType::GeneratedPhrase,
+            _ => panic!("invalid password type"),
+        }),
+        counter: matches.value_of("counter")
+        .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
+        variant: matches.value_of("variant").map(|s| match s {
+            "p" | "password"
+                => SiteVariant::Password,
+            "l" | "login"
+                => SiteVariant::Login,
+            "a" | "answer"
+                => SiteVariant::Answer,
+            _ => panic!("invalid site variant"),
+        }),
+        context: matches.value_of("context"),
+    };
+    let site = Site::from_config(site_config);
 
     print!("Please enter the master password: ");
-    std::io::stdout().flush().unwrap();
-    let password = read_password().expect("could not read password");
+    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
+    let master_password = read_password().expect("could not read password");
 
-    let identicon = identicon(full_name.as_bytes(), password.as_bytes());
+    let full_name = config.full_name.unwrap_or("");
+    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
-    let master_key = master_key_for_user_v3(full_name.as_bytes(), password.as_bytes());
+    let master_key = master_key_for_user_v3(
+        full_name.as_bytes(),
+        master_password.as_bytes()
+    );
     let generated_password = password_for_site_v3(
-        &master_key, site_name.as_bytes(), site_type, counter, variant, context.as_bytes());
-    println!("Password for {}: {}", site_name, *generated_password);
+        &master_key,
+        site.name.as_bytes(),
+        site.type_,
+        site.counter,
+        site.variant,
+        site.context.as_bytes()
+    );
+    println!("Password for {}: {}", site.name, *generated_password);
 }

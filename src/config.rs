@@ -9,13 +9,13 @@ use algorithm::{SiteType, SiteVariant};
 #[derive(Serialize, Debug)]
 pub struct Config<'a> {
     pub full_name: Option<&'a str>,
-    pub sites: Vec<SiteConfig<'a>>,
+    pub sites: Option<Vec<SiteConfig<'a>>>,
 }
 
 impl<'a> Config<'a> {
     /// Create a new empty configuration.
     pub fn new() -> Config<'a> {
-        Config { full_name: None, sites: Vec::new() }
+        Config { full_name: None, sites: None }
     }
 
     /// Encode the config as a TOML string.
@@ -71,6 +71,36 @@ impl<'a> Site<'a> {
 
 #[test]
 fn test_config_encode() {
-    let c = Config::new();
+    let mut c = Config::new();
     assert_eq!(c.encode(), "");
+    c.full_name = Some("John Doe");
+    assert_eq!(c.encode(), "full_name = \"John Doe\"\n");
+
+    let wikipedia = SiteConfig::new("wikipedia.org");
+    c.sites = Some(vec![wikipedia]);
+    assert_eq!(c.encode(),
+r#"full_name = "John Doe"
+
+[[sites]]
+name = "wikipedia.org"
+"#);
+
+    let mut github = SiteConfig::new("github.com");
+    //github.type_ = Some(SiteType::GeneratedMaximum);
+    github.counter = Some(1);
+    //github.variant = Some(SiteVariant::Password);
+    github.context = Some("");
+    let bitbucket = SiteConfig::new("bitbucket.org");
+    c.sites = Some(vec![github, bitbucket]);
+    assert_eq!(c.encode(),
+r#"full_name = "John Doe"
+
+[[sites]]
+context = ""
+counter = 1
+name = "github.com"
+
+[[sites]]
+name = "bitbucket.org"
+"#);
 }

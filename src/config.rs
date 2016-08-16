@@ -1,8 +1,6 @@
 extern crate toml;
 extern crate serde;
 
-use self::serde::Serialize;
-
 use algorithm::{SiteType, SiteVariant};
 
 /// Represent the configuration state that can be stored on disk.

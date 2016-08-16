@@ -2,7 +2,7 @@ extern crate crypto;
 extern crate byteorder;
 extern crate serde;
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 
 use self::crypto::scrypt::{scrypt, ScryptParams};

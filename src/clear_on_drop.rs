@@ -1,7 +1,7 @@
 extern crate crypto;
 
 use std::convert::AsMut;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use self::crypto::util::secure_memset;
 
@@ -46,7 +46,7 @@ impl UnsafeAsMut for String {
 /// Useful to make sure that secret data is cleared from memory after use.
 #[derive(Debug)]
 pub struct ClearOnDrop<T: UnsafeAsMut> {
-    pub container: T
+    container: T
 }
 
 impl<T: UnsafeAsMut> ClearOnDrop<T> {
@@ -60,6 +60,12 @@ impl<T: UnsafeAsMut> Deref for ClearOnDrop<T> {
 
     fn deref(&self) -> &T {
         &self.container
+    }
+}
+
+impl<T: UnsafeAsMut> DerefMut for ClearOnDrop<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.container
     }
 }
 

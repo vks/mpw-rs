@@ -92,7 +92,7 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Clear
     assert!(!master_key_salt.is_empty());
 
     let mut master_key = ClearOnDrop::new([0; 64]);
-    scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut master_key.container);
+    scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut *master_key);
 
     master_key
 }
@@ -128,7 +128,7 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
     let mut site_password = ClearOnDrop::new(String::new());
     for i in 0..template.len() {
         let c = template.chars().nth(i).unwrap();
-        site_password.container.push(
+        site_password.push(
             character_from_class(c, site_password_seed[i + 1])
         );
     }

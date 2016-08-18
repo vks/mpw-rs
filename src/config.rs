@@ -29,6 +29,7 @@ impl<'a> Config<'a> {
 #[derive(Serialize, Debug, Clone)]
 pub struct SiteConfig<'a> {
     pub name: Cow<'a, str>,
+    #[serde(rename = "type")]
     pub type_: Option<SiteType>,
     pub counter: Option<u32>,
     pub variant: Option<SiteVariant>,
@@ -114,7 +115,7 @@ r#"full_name = "John Doe"
 context = ""
 counter = 1
 name = "github.com"
-type_ = "maximum"
+type = "maximum"
 variant = "password"
 
 [[sites]]

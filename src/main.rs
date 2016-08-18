@@ -150,6 +150,6 @@ fn main() {
     if dump_config {
         let s = config.encode();
         assert!(s != "");
-        println!("{}", s);
+        println!("config:\n```\n{}```", s);
     }
 }

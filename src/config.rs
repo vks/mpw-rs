@@ -1,12 +1,15 @@
 extern crate toml;
 extern crate serde;
 
+use std::borrow::{Cow, Borrow};
+
 use algorithm::{SiteType, SiteVariant};
+
 
 /// Represent the configuration state that can be stored on disk.
 #[derive(Serialize, Debug)]
 pub struct Config<'a> {
-    pub full_name: Option<&'a str>,
+    pub full_name: Option<Cow<'a, str>>,
     pub sites: Option<Vec<SiteConfig<'a>>>,
 }
 
@@ -25,18 +28,18 @@ impl<'a> Config<'a> {
 /// The configuration that can be stored about a site.
 #[derive(Serialize, Debug, Clone)]
 pub struct SiteConfig<'a> {
-    pub name: &'a str,
+    pub name: Cow<'a, str>,
     pub type_: Option<SiteType>,
     pub counter: Option<u32>,
     pub variant: Option<SiteVariant>,
-    pub context: Option<&'a str>,
+    pub context: Option<Cow<'a, str>>,
 }
 
 impl<'a> SiteConfig<'a> {
     /// Create a new site configuration with the given domain name.
     pub fn new(name: &'a str) -> SiteConfig<'a> {
         SiteConfig {
-            name: name,
+            name: name.into(),
             type_: None,
             counter: None,
             variant: None,
@@ -48,16 +51,16 @@ impl<'a> SiteConfig<'a> {
 /// The configuration state of a site with all default values plugged in.
 #[derive(Debug, Clone)]
 pub struct Site<'a> {
-    pub name: &'a str,
+    pub name: Cow<'a, str>,
     pub type_: SiteType,
     pub counter: u32,
     pub variant: SiteVariant,
-    pub context: &'a str,
+    pub context: Cow<'a, str>,
 }
 
 impl<'a> Site<'a> {
     /// Create a site from a given config. Missing values are filled with defaults.
-    pub fn from_config(config: &SiteConfig<'a>) -> Site<'a> {
+    pub fn from_config(config: &'a SiteConfig<'a>) -> Site<'a> {
         let variant = config.variant.unwrap_or(SiteVariant::Password);
         let type_ = config.type_.unwrap_or(
             match variant {
@@ -66,13 +69,17 @@ impl<'a> Site<'a> {
                 SiteVariant::Answer => SiteType::GeneratedPhrase,
             }
         );
+        let context = match config.context {
+            Some(ref s) => s.as_ref().into(),
+            None => "".into(),
+        };
 
         Site {
-            name: config.name,
+            name: config.name.as_ref().into(),
             type_: type_,
             counter: config.counter.unwrap_or(1),
             variant: variant,
-            context: config.context.unwrap_or(""),
+            context: context,
         }
     }
 }
@@ -81,7 +88,7 @@ impl<'a> Site<'a> {
 fn test_config_encode() {
     let mut c = Config::new();
     assert_eq!(c.encode(), "");
-    c.full_name = Some("John Doe");
+    c.full_name = Some("John Doe".into());
     assert_eq!(c.encode(), "full_name = \"John Doe\"\n");
 
     let wikipedia = SiteConfig::new("wikipedia.org");
@@ -97,7 +104,7 @@ name = "wikipedia.org"
     github.type_ = Some(SiteType::GeneratedMaximum);
     github.counter = Some(1);
     github.variant = Some(SiteVariant::Password);
-    github.context = Some("");
+    github.context = Some("".into());
     let bitbucket = SiteConfig::new("bitbucket.org");
     c.sites = Some(vec![github, bitbucket]);
     assert_eq!(c.encode(),

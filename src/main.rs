@@ -127,8 +127,8 @@ fn main() {
         }),
         context: matches.value_of("context"),
     };
+    let site = Site::from_config(&site_config);
     config.sites = Some(vec![site_config]);
-    let site = Site::from_config(site_config);
 
     let dump_config = matches.is_present("dump");
 

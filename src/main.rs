@@ -76,6 +76,9 @@ fn main() {
              .short("C")
              .help("Empty for a universal site or the most significant word(s) of the question")
              .takes_value(true))
+        .arg(Arg::with_name("dump")
+             .short("d")
+             .help("Dump the configuration as a TOML file"))
         .get_matches();
 
     let mut config = Config::new();
@@ -115,7 +118,10 @@ fn main() {
         }),
         context: matches.value_of("context"),
     };
+    config.sites = Some(vec![site_config]);
     let site = Site::from_config(site_config);
+
+    let dump_config = matches.is_present("dump");
 
     print!("Please enter the master password: ");
     std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
@@ -137,4 +143,10 @@ fn main() {
         site.context.as_bytes()
     );
     println!("Password for {}: {}", site.name, *generated_password);
+
+    if dump_config {
+        let s = config.encode();
+        assert!(s != "");
+        println!("{}", s);
+    }
 }

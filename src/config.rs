@@ -58,11 +58,20 @@ pub struct Site<'a> {
 impl<'a> Site<'a> {
     /// Create a site from a given config. Missing values are filled with defaults.
     pub fn from_config(config: SiteConfig<'a>) -> Site<'a> {
+        let variant = config.variant.unwrap_or(SiteVariant::Password);
+        let type_ = config.type_.unwrap_or(
+            match variant {
+                SiteVariant::Password => SiteType::GeneratedLong,
+                SiteVariant::Login => SiteType::GeneratedName,
+                SiteVariant::Answer => SiteType::GeneratedPhrase,
+            }
+        );
+
         Site {
             name: config.name,
-            type_: config.type_.unwrap_or(SiteType::GeneratedLong),
+            type_: type_,
             counter: config.counter.unwrap_or(1),
-            variant: config.variant.unwrap_or(SiteVariant::Password),
+            variant: variant,
             context: config.context.unwrap_or(""),
         }
     }

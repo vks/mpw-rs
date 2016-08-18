@@ -18,8 +18,9 @@ mod config;
 use config::*;
 
 static TYPE_HELP: &'static str =
-"The password's template (defaults to 'long' for password, 'name' for login)
-
+"The password's template{n}\
+(defaults to 'long' for password, 'name' for login, 'phrase' for answer){n}\
+{n}\
 x, max, maximum   20 characters, contains symbols.{n}\
 l, long           Copy-friendly, 14 characters, contains symbols.{n}\
 m, med, medium    Copy-friendly, 8 characters, contains symbols.{n}\
@@ -38,15 +39,16 @@ fn main() {
              .number_of_values(1)
              .index(1))
         .arg(Arg::with_name("full name")
+             .long("name")
              .short("u")
              .help("The full name of the user")
              .required(true)
              .number_of_values(1)
              .takes_value(true))
         .arg(Arg::with_name("type")
+             .long("type")
              .short("t")
              .help(TYPE_HELP)
-             .next_line_help(true)
              .takes_value(true)
              .number_of_values(1)
              .possible_values(&[
@@ -60,11 +62,13 @@ fn main() {
                  "p", "phrase",
              ]))
         .arg(Arg::with_name("counter")
+             .long("counter")
              .short("c")
              .help("The value of the site counter")
              .takes_value(true)
              .number_of_values(1))
         .arg(Arg::with_name("variant")
+             .long("variant")
              .short("v")
              .help("The kind of content to generate")
              .takes_value(true)
@@ -75,11 +79,13 @@ fn main() {
                 "a", "answer"
              ]))
         .arg(Arg::with_name("context")
+             .long("context")
              .short("C")
              .help("Empty for a universal site or the most significant word(s) of the question")
              .number_of_values(1)
              .takes_value(true))
         .arg(Arg::with_name("dump")
+             .long("dump")
              .short("d")
              .help("Dump the configuration as a TOML file"))
         .get_matches();

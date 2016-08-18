@@ -23,7 +23,7 @@ impl<'a> Config<'a> {
 }
 
 /// The configuration that can be stored about a site.
-#[derive(Serialize, Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone)]
 pub struct SiteConfig<'a> {
     pub name: &'a str,
     pub type_: Option<SiteType>,
@@ -46,7 +46,7 @@ impl<'a> SiteConfig<'a> {
 }
 
 /// The configuration state of a site with all default values plugged in.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Site<'a> {
     pub name: &'a str,
     pub type_: SiteType,
@@ -57,7 +57,7 @@ pub struct Site<'a> {
 
 impl<'a> Site<'a> {
     /// Create a site from a given config. Missing values are filled with defaults.
-    pub fn from_config(config: SiteConfig<'a>) -> Site<'a> {
+    pub fn from_config(config: &SiteConfig<'a>) -> Site<'a> {
         let variant = config.variant.unwrap_or(SiteVariant::Password);
         let type_ = config.type_.unwrap_or(
             match variant {

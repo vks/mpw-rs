@@ -7,6 +7,7 @@ extern crate clap;
 extern crate rpassword;
 
 use std::io::Write;
+use std::borrow::{Cow, Borrow};
 
 use clap::{Arg, App};
 use rpassword::read_password;
@@ -91,10 +92,12 @@ fn main() {
         .get_matches();
 
     let mut config = Config::new();
-    config.full_name = matches.value_of("full name");
+    config.full_name = matches.value_of("full name").map(Into::into);
+    //^ Is required, thus present.
 
     let site_config = SiteConfig {
-        name: matches.value_of("site name").unwrap(),  // Is required, thus present.
+        name: matches.value_of("site name").unwrap().into(),
+        //^ Is required, thus present.
         type_: matches.value_of("type").map(|s| match s {
             "x" | "max" | "maximum"
                 => SiteType::GeneratedMaximum,
@@ -125,10 +128,11 @@ fn main() {
                 => SiteVariant::Answer,
             _ => panic!("invalid site variant"),
         }),
-        context: matches.value_of("context"),
+        context: matches.value_of("context").map(Into::into),
     };
-    let site = Site::from_config(&site_config);
     config.sites = Some(vec![site_config]);
+    let site_config = &config.sites.as_ref().unwrap()[0];
+    let site = Site::from_config(site_config);
 
     let dump_config = matches.is_present("dump");
 
@@ -136,7 +140,7 @@ fn main() {
     std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
     let master_password = read_password().expect("could not read password");
 
-    let full_name = config.full_name.unwrap_or("");
+    let full_name = config.full_name.as_ref().unwrap();
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
     let master_key = master_key_for_user_v3(

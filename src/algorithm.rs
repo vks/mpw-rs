@@ -295,4 +295,38 @@ fn test_identicon() {
     assert_eq!(identicon, "╔░╝⌚");
 }
 
-// TODO make sure unicode strings work
+#[test]
+fn test_unicode_user_name() {
+    let full_name = "Max Müller";
+    let master_password = "passwort";
+    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
+    assert_eq!(identicon, "═▒╝♚");
+    let master_key = master_key_for_user_v3(
+        full_name.as_bytes(),
+        master_password.as_bytes()
+    );
+    let site_name = "de.wikipedia.org";
+    let password = password_for_site_v3(
+        &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
+        SiteVariant::Password, &[]
+    );
+    assert_eq!(*password, "DaknJezb6,Zula");
+}
+
+#[test]
+fn test_unicode_site_name() {
+    let full_name = "Zhang Wei";
+    let master_password = "password";
+    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
+    assert_eq!(identicon, "╔░╗◒");
+    let master_key = master_key_for_user_v3(
+        full_name.as_bytes(),
+        master_password.as_bytes()
+    );
+    let site_name = "山东大学.cn";
+    let password = password_for_site_v3(
+        &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
+        SiteVariant::Password, &[]
+    );
+    assert_eq!(*password, "ZajmGabl0~Zoza");
+}

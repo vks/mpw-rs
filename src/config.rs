@@ -17,13 +17,13 @@ impl<'a> Config<'a> {
     }
 
     /// Encode the config as a TOML string.
-    fn encode(&self) -> String {
+    pub fn encode(&self) -> String {
         toml::encode_str(self)
     }
 }
 
 /// The configuration that can be stored about a site.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone, Copy)]
 pub struct SiteConfig<'a> {
     pub name: &'a str,
     pub type_: Option<SiteType>,
@@ -46,6 +46,7 @@ impl<'a> SiteConfig<'a> {
 }
 
 /// The configuration state of a site with all default values plugged in.
+#[derive(Debug, Clone, Copy)]
 pub struct Site<'a> {
     pub name: &'a str,
     pub type_: SiteType,

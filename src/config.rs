@@ -19,6 +19,11 @@ impl<'a> Config<'a> {
         Config { full_name: None, sites: None }
     }
 
+    /// Create a configuration given a TOML string.
+    pub fn from_str(s: &'a str) -> Config<'a> {
+        unimplemented!()
+    }
+
     /// Encode the config as a TOML string.
     pub fn encode(&self) -> String {
         toml::encode_str(self)
@@ -137,4 +142,14 @@ fn test_type_encode() {
     struct T { type_: SiteType }
     assert_eq!(toml::encode_str(&T { type_: SiteType::GeneratedLong }),
                "type_ = \"long\"\n");
+}
+
+#[test]
+fn test_config_decode() {
+    let config_str = r#"full_name = "John Doe"
+
+[[sites]]
+name = "github.com"
+type = "maximum"
+"#;
 }

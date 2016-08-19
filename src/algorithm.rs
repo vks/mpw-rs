@@ -1,10 +1,10 @@
 extern crate crypto;
 extern crate byteorder;
-extern crate serde;
 
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 
+use ::serde::de::Visitor;
 use self::crypto::scrypt::{scrypt, ScryptParams};
 use self::crypto::digest::Digest;
 use self::crypto::sha2::Sha256;
@@ -19,7 +19,7 @@ lazy_static! {
 }
 
 /// Represent which variant of password to generate.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SiteVariant {
     /// Generate the password to login with.
     Password,
@@ -29,9 +29,26 @@ pub enum SiteVariant {
     Answer,
 }
 
-impl serde::Serialize for SiteVariant {
+impl SiteVariant {
+    /// Try to construct a SiteVariant from a string.
+    ///
+    /// Returns None if the string does not correspond to a variant.
+    pub fn from_str(s: &str) -> Option<SiteVariant> {
+        match s {
+            "p" | "password"
+                => Some(SiteVariant::Password),
+            "l" | "login"
+                => Some(SiteVariant::Login),
+            "a" | "answer"
+                => Some(SiteVariant::Answer),
+            _ => None,
+        }
+    }
+}
+
+impl ::serde::Serialize for SiteVariant {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: serde::Serializer 
+        where S: ::serde::Serializer
     {
         serializer.serialize_str(match *self {
             SiteVariant::Password => "password",
@@ -41,7 +58,29 @@ impl serde::Serialize for SiteVariant {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+impl ::serde::Deserialize for SiteVariant {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: ::serde::Deserializer
+    {
+        struct Visitor;
+
+        impl ::serde::de::Visitor for Visitor {
+            type Value = SiteVariant;
+
+            fn visit_str<E>(&mut self, value: &str) -> Result<SiteVariant, E>
+                where E: ::serde::Error
+            {
+                SiteVariant::from_str(value)
+                    .ok_or(E::invalid_value(
+                    &format!("unknown SiteVariant variant: {}", value)))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SiteType {
     GeneratedMaximum,
     GeneratedLong,
@@ -55,9 +94,36 @@ pub enum SiteType {
     StoredDevicePrivate,
 }
 
-impl serde::Serialize for SiteType {
+impl SiteType {
+    /// Try to construct a SiteType from a string.
+    ///
+    /// Returns None if the string does not correspond to a variant.
+    pub fn from_str(s: &str) -> Option<SiteType> {
+        match s {
+            "x" | "max" | "maximum"
+                => Some(SiteType::GeneratedMaximum),
+            "l" | "long"
+                => Some(SiteType::GeneratedLong),
+            "m" | "med" | "medium"
+                => Some(SiteType::GeneratedMedium),
+            "b" | "basic"
+                => Some(SiteType::GeneratedBasic),
+            "s" | "short"
+                => Some(SiteType::GeneratedShort),
+            "i" | "pin"
+                => Some(SiteType::GeneratedPIN),
+            "n" | "name"
+                => Some(SiteType::GeneratedName),
+            "p" | "phrase"
+                => Some(SiteType::GeneratedPhrase),
+            _ => None,
+        }
+    }
+}
+
+impl ::serde::Serialize for SiteType {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: serde::Serializer
+        where S: ::serde::Serializer
     {
         serializer.serialize_str(match *self {
             SiteType::GeneratedMaximum => "maximum",
@@ -70,6 +136,28 @@ impl serde::Serialize for SiteType {
             SiteType::GeneratedPhrase => "phrase",
             _ => unimplemented!(),
         })
+    }
+}
+
+impl ::serde::Deserialize for SiteType {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: ::serde::Deserializer
+    {
+        struct Visitor;
+
+        impl ::serde::de::Visitor for Visitor {
+            type Value = SiteType;
+
+            fn visit_str<E>(&mut self, value: &str) -> Result<SiteType, E>
+                where E: ::serde::Error
+            {
+                SiteType::from_str(value)
+                    .ok_or(E::invalid_value(
+                    &format!("unknown SiteType variant: {}", value)))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 

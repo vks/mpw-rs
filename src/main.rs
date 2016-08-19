@@ -1,10 +1,11 @@
-#![feature(try_from, custom_derive, plugin)]
+#![feature(try_from, custom_derive, plugin, question_mark)]
 #![plugin(serde_macros)]
 
 #[macro_use]
 extern crate lazy_static;
 extern crate clap;
 extern crate rpassword;
+extern crate serde;
 
 use std::io::Write;
 use std::borrow::{Cow, Borrow};
@@ -98,36 +99,10 @@ fn main() {
     let site_config = SiteConfig {
         name: matches.value_of("site name").unwrap().into(),
         //^ Is required, thus present.
-        type_: matches.value_of("type").map(|s| match s {
-            "x" | "max" | "maximum"
-                => SiteType::GeneratedMaximum,
-            "l" | "long"
-                => SiteType::GeneratedLong,
-            "m" | "med" | "medium"
-                => SiteType::GeneratedMedium,
-            "b" | "basic"
-                => SiteType::GeneratedBasic,
-            "s" | "short"
-                => SiteType::GeneratedShort,
-            "i" | "pin"
-                => SiteType::GeneratedPIN,
-            "n" | "name"
-                => SiteType::GeneratedName,
-            "p" | "phrase"
-                => SiteType::GeneratedPhrase,
-            _ => panic!("invalid password type"),
-        }),
+        type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
         counter: matches.value_of("counter")
         .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
-        variant: matches.value_of("variant").map(|s| match s {
-            "p" | "password"
-                => SiteVariant::Password,
-            "l" | "login"
-                => SiteVariant::Login,
-            "a" | "answer"
-                => SiteVariant::Answer,
-            _ => panic!("invalid site variant"),
-        }),
+        variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
         context: matches.value_of("context").map(Into::into),
     };
     config.sites = Some(vec![site_config]);

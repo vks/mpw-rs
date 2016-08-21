@@ -1,5 +1,4 @@
 extern crate toml;
-extern crate serde;
 
 use std::borrow::{Cow, Borrow};
 
@@ -7,7 +6,7 @@ use algorithm::{SiteType, SiteVariant};
 
 
 /// Represent the configuration state that can be stored on disk.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Config<'a> {
     pub full_name: Option<Cow<'a, str>>,
     pub sites: Option<Vec<SiteConfig<'a>>>,
@@ -19,9 +18,9 @@ impl<'a> Config<'a> {
         Config { full_name: None, sites: None }
     }
 
-    /// Create a configuration given a TOML string.
-    pub fn from_str(s: &'a str) -> Config<'a> {
-        unimplemented!()
+    /// Try to create a configuration given a TOML string.
+    pub fn from_str(s: &'a str) -> Option<Config<'a>> {
+        toml::decode_str(s)
     }
 
     /// Encode the config as a TOML string.
@@ -31,7 +30,7 @@ impl<'a> Config<'a> {
 }
 
 /// The configuration that can be stored about a site.
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SiteConfig<'a> {
     pub name: Cow<'a, str>,
     #[serde(rename = "type")]
@@ -55,7 +54,7 @@ impl<'a> SiteConfig<'a> {
 }
 
 /// The configuration state of a site with all default values plugged in.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Site<'a> {
     pub name: Cow<'a, str>,
     pub type_: SiteType,
@@ -152,4 +151,13 @@ fn test_config_decode() {
 name = "github.com"
 type = "maximum"
 "#;
+    let config = Config::from_str(config_str).unwrap();
+
+    let mut expected_config = Config::new();
+    expected_config.full_name = Some("John Doe".into());
+    let mut github = SiteConfig::new("github.com");
+    github.type_ = Some(SiteType::GeneratedMaximum);
+    expected_config.sites = Some(vec![github]);
+
+    assert_eq!(config, expected_config);
 }

@@ -7,7 +7,8 @@ extern crate clap;
 extern crate rpassword;
 extern crate serde;
 
-use std::io::Write;
+use std::io::{Read, Write};
+use std::fs::File;
 use std::borrow::{Cow, Borrow};
 
 use clap::{Arg, App};
@@ -44,7 +45,7 @@ fn main() {
              .long("name")
              .short("u")
              .help("The full name of the user")
-             .required(true)
+             .required_unless("config")
              .number_of_values(1)
              .takes_value(true))
         .arg(Arg::with_name("type")
@@ -84,30 +85,48 @@ fn main() {
              .long("context")
              .short("C")
              .help("Empty for a universal site or the most significant word(s) of the question")
-             .number_of_values(1)
-             .takes_value(true))
+             .takes_value(true)
+             .number_of_values(1))
         .arg(Arg::with_name("dump")
              .long("dump")
              .short("d")
              .help("Dump the configuration as a TOML file"))
+        .arg(Arg::with_name("config")
+             .long("config")
+             .short("f")
+             .help("Read configuration from a TOML file")
+             .takes_value(true)
+             .number_of_values(1))
         .get_matches();
 
-    let mut config = Config::new();
-    config.full_name = matches.value_of("full name").map(Into::into);
-    //^ Is required, thus present.
+    // If given, read config from path.
+    let config_path = matches.value_of("config");
+    let mut config_string = String::new();
+    let mut config = if let Some(path) = config_path {
+        let mut f = File::open(path)
+            .expect("could not open given config file");
+        f.read_to_string(&mut config_string)
+            .expect("could not read given config file");
+        Config::from_str(&config_string)
+            .expect("could not parse given config file")
+    } else {
+        Config::new()
+    };
 
-    let site_config = SiteConfig {
+    let mut param_config = Config::new();
+    param_config.full_name = matches.value_of("full name").map(Into::into);
+    let param_site_config = SiteConfig {
         name: matches.value_of("site name").unwrap().into(),
-        //^ Is required, thus present.
+        //^ required, thus present
         type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
         counter: matches.value_of("counter")
         .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
         variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
         context: matches.value_of("context").map(Into::into),
     };
-    config.sites = Some(vec![site_config]);
-    let site_config = &config.sites.as_ref().unwrap()[0];
-    let site = Site::from_config(site_config);
+    param_config.sites = Some(vec![param_site_config]);
+
+    config.merge(param_config);
 
     let dump_config = matches.is_present("dump");
 
@@ -122,15 +141,19 @@ fn main() {
         full_name.as_bytes(),
         master_password.as_bytes()
     );
-    let generated_password = password_for_site_v3(
-        &master_key,
-        site.name.as_bytes(),
-        site.type_,
-        site.counter,
-        site.variant,
-        site.context.as_bytes()
-    );
-    println!("Password for {}: {}", site.name, *generated_password);
+
+    for site_config in config.sites.as_ref().unwrap().iter() {
+        let site = Site::from_config(site_config);
+        let generated_password = password_for_site_v3(
+            &master_key,
+            site.name.as_bytes(),
+            site.type_,
+            site.counter,
+            site.variant,
+            site.context.as_bytes()
+        );
+        println!("Password for {}: {}", site.name, *generated_password);
+    }
 
     if dump_config {
         let s = config.encode();

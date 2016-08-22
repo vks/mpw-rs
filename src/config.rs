@@ -5,6 +5,16 @@ use std::borrow::{Cow, Borrow};
 use algorithm::{SiteType, SiteVariant};
 
 
+/// Merge two options, prefering Some and the new one.
+fn merge_options<T>(old: Option<T>, new: Option<T>) -> Option<T> {
+    match (old.is_some(), new.is_some()) {
+        (true, true) => new,
+        (true, false) => old,
+        (false, true) => new,
+        (false, false) => None,
+    }
+}
+
 /// Represent the configuration state that can be stored on disk.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Config<'a> {
@@ -26,6 +36,18 @@ impl<'a> Config<'a> {
     /// Encode the config as a TOML string.
     pub fn encode(&self) -> String {
         toml::encode_str(self)
+    }
+
+    /// Merge another configuration into this one.
+    ///
+    /// Values from the other configuration are prefered unless None.
+    pub fn merge(&mut self, other: Config<'a>) {
+        if other.full_name.is_some() {
+            self.full_name = other.full_name;
+        }
+        if let Some(sites) = other.sites {
+            self.sites.as_mut().map(|mut s| s.extend(sites));
+        }
     }
 }
 
@@ -49,6 +71,21 @@ impl<'a> SiteConfig<'a> {
             counter: None,
             variant: None,
             context: None,
+        }
+    }
+
+    /// Merge another configuration into this one.
+    ///
+    /// Values from the other configuration are prefered unless None.
+    /// Panics if the configurations are not for the same website.
+    pub fn merge(&mut self, other: SiteConfig<'a>) {
+        assert_eq!(self.name, other.name,
+                   "can only merge configs for the same site");
+        self.type_ = merge_options(self.type_, other.type_);
+        self.counter = merge_options(self.counter, other.counter);
+        self.variant = merge_options(self.variant, other.variant);
+        if other.context.is_some() {
+            self.context = other.context;
         }
     }
 }

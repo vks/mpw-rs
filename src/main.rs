@@ -36,7 +36,7 @@ p, phrase         20 character sentence.";
 fn main() {
     let matches = App::new("Master Password")
         .about("A stateless password management solution.")
-        .arg(Arg::with_name("site name")
+        .arg(Arg::with_name("site")
              .help("The domain name of the site.")
              .required(true)
              .number_of_values(1)
@@ -116,7 +116,7 @@ fn main() {
     let mut param_config = Config::new();
     param_config.full_name = matches.value_of("full name").map(Into::into);
     let param_site_config = SiteConfig {
-        name: matches.value_of("site name").unwrap().into(),
+        name: matches.value_of("site").unwrap().into(),
         //^ required, thus present
         type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
         counter: matches.value_of("counter")

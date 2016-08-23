@@ -4,7 +4,6 @@ extern crate byteorder;
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 
-use ::serde::de::Visitor;
 use self::crypto::scrypt::{scrypt, ScryptParams};
 use self::crypto::digest::Digest;
 use self::crypto::sha2::Sha256;

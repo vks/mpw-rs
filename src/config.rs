@@ -1,6 +1,6 @@
 extern crate toml;
 
-use std::borrow::{Cow, Borrow};
+use std::borrow::Cow;
 
 use algorithm::{SiteType, SiteVariant};
 

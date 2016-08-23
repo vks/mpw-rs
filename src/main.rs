@@ -9,7 +9,6 @@ extern crate serde;
 
 use std::io::{Read, Write};
 use std::fs::File;
-use std::borrow::{Cow, Borrow};
 
 use clap::{Arg, App};
 use rpassword::read_password;

@@ -70,8 +70,8 @@ impl ::serde::Deserialize for SiteVariant {
                 where E: ::serde::Error
             {
                 SiteVariant::from_str(value)
-                    .ok_or(E::invalid_value(
-                    &format!("unknown SiteVariant variant: {}", value)))
+                    .ok_or_else(|| E::invalid_value(
+                                   &format!("unknown SiteVariant variant: {}", value)))
             }
         }
 
@@ -151,8 +151,8 @@ impl ::serde::Deserialize for SiteType {
                 where E: ::serde::Error
             {
                 SiteType::from_str(value)
-                    .ok_or(E::invalid_value(
-                    &format!("unknown SiteType variant: {}", value)))
+                    .ok_or_else(|| E::invalid_value(
+                                   &format!("unknown SiteType variant: {}", value)))
             }
         }
 

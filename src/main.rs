@@ -37,7 +37,6 @@ fn main() {
         .about("A stateless password management solution.")
         .arg(Arg::with_name("site")
              .help("The domain name of the site.")
-             .required(true)
              .number_of_values(1)
              .index(1))
         .arg(Arg::with_name("full name")
@@ -89,13 +88,31 @@ fn main() {
         .arg(Arg::with_name("dump")
              .long("dump")
              .short("d")
-             .help("Dump the configuration as a TOML file."))
+             .help("Dump the configuration as a TOML."))
         .arg(Arg::with_name("config")
              .long("config")
              .short("f")
              .help("Read configuration from a TOML file.")
              .takes_value(true)
              .number_of_values(1))
+        .arg(Arg::with_name("add")
+             .long("add")
+             .short("a")
+             .help("Add parameters of site password to configuration file.")
+             .requires_all(&["site", "config"])
+             .conflicts_with_all(&["replace", "delete"]))
+        .arg(Arg::with_name("replace")
+             .long("replace")
+             .short("r")
+             .help("Replace parameters of site password in configuration file.")
+             .requires_all(&["site", "config"])
+             .conflicts_with_all(&["add", "delete"]))
+        .arg(Arg::with_name("delete")
+             .long("delete")
+             .short("D")
+             .help("Delete parameters of site password in configuration file.")
+             .requires_all(&["site", "config"])
+             .conflicts_with_all(&["add", "replace"]))
         .get_matches();
 
     // If given, read config from path.
@@ -114,31 +131,63 @@ fn main() {
 
     let mut param_config = Config::new();
     param_config.full_name = matches.value_of("full name").map(Into::into);
-    let param_site_config = SiteConfig {
-        name: matches.value_of("site").unwrap().into(),
-        //^ required, thus present
-        type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
-        counter: matches.value_of("counter")
-        .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
-        variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
-        context: matches.value_of("context").map(Into::into),
-    };
-    param_config.sites = Some(vec![param_site_config]);
+    let param_site_name = matches.value_of("site");
+    if let Some(name) = param_site_name {
+        let param_site_config = SiteConfig {
+            name: name.into(),
+            type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
+            counter: matches.value_of("counter")
+            .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
+            variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
+            context: matches.value_of("context").map(Into::into),
+        };
+        param_config.sites = Some(vec![param_site_config]);
+    }
 
-    config.merge(param_config);
+    if matches.is_present("replace") || matches.is_present("delete") {
+        // Remove all sites that have the given name.
+        let param_site_name = param_site_name.unwrap();
+        if let Some(ref mut sites) = config.sites {
+            sites.retain(|ref s| s.name != param_site_name);
+        }
+    }
+
+    if matches.is_present("add") ||
+       matches.is_present("replace") {
+        config.merge(param_config);
+    }
+
+    if matches.is_present("add") ||
+       matches.is_present("replace") ||
+       matches.is_present("delete") {
+        // Overwrite config file.
+        let s = config.encode();
+        assert!(s != "");
+        let path = config_path.as_ref().unwrap();  // Clap checked it is present.
+        let mut f = File::create(path)
+            .expect("could not overwrite given config file");
+        f.write_all(s.as_bytes())
+            .expect("could not write to given config file");
+        return;
+    }
 
     if matches.is_present("dump") {
+        // Output config.
         let s = config.encode();
         assert!(s != "");
         println!("{}", s);
         return;
     }
 
+
+    // Generate password from master key.
+
     print!("Please enter the master password: ");
     std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
     let master_password = read_password().expect("could not read password");
 
-    let full_name = config.full_name.as_ref().unwrap();
+    let full_name = config.full_name.as_ref()
+        .expect("need full name to generate master key");
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
     let master_key = master_key_for_user_v3(
@@ -148,6 +197,13 @@ fn main() {
 
     for site_config in config.sites.as_ref().unwrap().iter() {
         let site = Site::from_config(site_config);
+        // If a site was given, skip all other sites.
+        // FIXME: site from parameter should not be printed if already present?
+        if let Some(name) = param_site_name {
+            if name != site.name {
+                continue;
+            }
+        }
         let generated_password = password_for_site_v3(
             &master_key,
             site.name.as_bytes(),
@@ -156,6 +212,7 @@ fn main() {
             site.variant,
             site.context.as_bytes()
         );
+        // TODO: print non-default parameters
         println!("Password for {}: {}", site.name, *generated_password);
     }
 }

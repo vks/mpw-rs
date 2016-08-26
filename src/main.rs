@@ -127,7 +127,12 @@ fn main() {
 
     config.merge(param_config);
 
-    let dump_config = matches.is_present("dump");
+    if matches.is_present("dump") {
+        let s = config.encode();
+        assert!(s != "");
+        println!("{}", s);
+        return;
+    }
 
     print!("Please enter the master password: ");
     std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
@@ -152,11 +157,5 @@ fn main() {
             site.context.as_bytes()
         );
         println!("Password for {}: {}", site.name, *generated_password);
-    }
-
-    if dump_config {
-        let s = config.encode();
-        assert!(s != "");
-        println!("config:\n```\n{}```", s);
     }
 }

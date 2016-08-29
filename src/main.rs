@@ -156,6 +156,11 @@ fn main() {
 
     if matches.is_present("add") ||
        matches.is_present("replace") {
+        if let (Some(config_name), Some(param_name)) =
+            (config.full_name.as_ref(), param_config.full_name.as_ref())
+        {
+            assert_eq!(config_name, param_name);
+        }
         config.merge(param_config);
     }
 

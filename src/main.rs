@@ -189,12 +189,13 @@ fn main() {
 
     // Generate password from master key.
 
+    let full_name = config.full_name.as_ref()
+        .expect("need full name to generate master key");
+
     print!("Please enter the master password: ");
     std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
     let master_password = read_password().expect("could not read password");
 
-    let full_name = config.full_name.as_ref()
-        .expect("need full name to generate master key");
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
     let master_key = master_key_for_user_v3(

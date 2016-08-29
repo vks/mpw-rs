@@ -30,7 +30,7 @@ b, basic          8 characters, no symbols.{n}\
 s, short          Copy-friendly, 4 characters, no symbols.{n}\
 i, pin            4 numbers.{n}\
 n, name           9 letter name.{n}\
-p, phrase         20 character sentence.";
+p, phrase         20 character sentence.{n}";
 
 fn main() {
     let matches = App::new("Master Password")
@@ -50,6 +50,7 @@ fn main() {
              .long("type")
              .short("t")
              .help(TYPE_HELP)
+             .next_line_help(true)
              .takes_value(true)
              .number_of_values(1)
              .possible_values(&[
@@ -113,6 +114,7 @@ fn main() {
              .help("Delete parameters of site password in configuration file.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "replace"]))
+        .set_term_width(0)
         .get_matches();
 
     // If given, read config from path.

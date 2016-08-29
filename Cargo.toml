@@ -2,6 +2,9 @@
 name = "mpw"
 version = "0.0.1"
 authors = ["Vinzent Steinberg <Vinzent.Steinberg@gmail.com>"]
+description = "A stateless password management solution."
+readme = "README.md"
+license = "MIT"
 
 [dependencies]
 rust-crypto = "0.2"

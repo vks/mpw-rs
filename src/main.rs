@@ -3,6 +3,7 @@
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
 extern crate clap;
 extern crate rpassword;
 extern crate serde;
@@ -35,6 +36,7 @@ p, phrase         20 character sentence.{n}";
 fn main() {
     let matches = App::new("Master Password")
         .about("A stateless password management solution.")
+        .version(crate_version!())
         .arg(Arg::with_name("site")
              .help("The domain name of the site.")
              .number_of_values(1)
@@ -105,13 +107,13 @@ fn main() {
         .arg(Arg::with_name("replace")
              .long("replace")
              .short("r")
-             .help("Replace parameters of site password in configuration file.")
+             .help("Replace parameters of all site passwords in configuration file.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "delete"]))
         .arg(Arg::with_name("delete")
              .long("delete")
              .short("D")
-             .help("Delete parameters of site password in configuration file.")
+             .help("Delete parameters of all site passwords in configuration file.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "replace"]))
         .set_term_width(0)

@@ -71,6 +71,9 @@ impl<T: UnsafeAsMut> DerefMut for ClearOnDrop<T> {
 
 impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
     fn drop(&mut self) {
+        // We use crypto's implementation of memset that makes sure it is not
+        // optimized away. It is safe to overwrite strings with zeros, because
+        // it is valid UTF-8.
         secure_memset(unsafe { self.container.as_mut() }, 0);
     }
 }

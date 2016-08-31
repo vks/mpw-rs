@@ -1,17 +1,17 @@
 //! This implements the Maser Password algorithm.
 //! See http://masterpasswordapp.com/algorithm.html.
 
-extern crate crypto;
+extern crate ring;
+extern crate ring_pwhash;
+extern crate hex;
 extern crate byteorder;
 
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 
-use self::crypto::scrypt::{scrypt, ScryptParams};
-use self::crypto::digest::Digest;
-use self::crypto::sha2::Sha256;
-use self::crypto::hmac::Hmac;
-use self::crypto::mac::Mac;
+use self::ring::{digest, hmac};
+use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
+use self::hex::ToHex;
 use self::byteorder::{BigEndian, WriteBytesExt};
 
 use clear_on_drop::ClearOnDrop;
@@ -205,10 +205,9 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
     }
     assert!(!site_password_salt.is_empty());
 
-    let mut hmac = Hmac::new(Sha256::new(), master_key);
-    hmac.input(&site_password_salt);
-    let mut site_password_seed = [0u8; 32];
-    hmac.raw_result(&mut site_password_seed);
+    let signing_key = hmac::SigningKey::new(&digest::SHA256, master_key);
+    let digest = hmac::sign(&signing_key, &site_password_salt);
+    let site_password_seed = digest.as_ref();
     assert!(!site_password_seed.is_empty());
 
     let template = template_for_type(site_type, site_password_seed[0]);
@@ -308,10 +307,8 @@ fn character_from_class(class: char, seed_byte: u8) -> char {
 
 /// Encode a fingerprint for a buffer.
 pub fn id_for_buf(buf: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.input(buf);
-    let hex = hasher.result_str();
-    hex
+    let digest = digest::digest(&digest::SHA256, buf);
+    digest.as_ref().to_hex()
 }
 
 /// Encode a visual fingerprint for a user.
@@ -326,11 +323,9 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
         "♪", "♫", "⚐", "⚑", "⚔", "⚖", "⚙", "⚠", "⌘", "⏎", "✄", "✆", "✈", "✉", "✌"
     ];
 
-    let mut hmac = Hmac::new(Sha256::new(), master_password);
-    hmac.input(full_name);
-
-    let mut identicon_seed = [0; 32];
-    hmac.raw_result(&mut identicon_seed);
+    let signing_key = hmac::SigningKey::new(&digest::SHA256, master_password);
+    let digest = hmac::sign(&signing_key, &full_name);
+    let identicon_seed = digest.as_ref();
 
     // TODO color
 

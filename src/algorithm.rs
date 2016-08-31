@@ -1,3 +1,6 @@
+//! This implements the Maser Password algorithm.
+//! See http://masterpasswordapp.com/algorithm.html.
+
 extern crate crypto;
 extern crate byteorder;
 
@@ -80,6 +83,7 @@ impl ::serde::Deserialize for SiteVariant {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Type of the site password.
 pub enum SiteType {
     GeneratedMaximum,
     GeneratedLong,
@@ -184,6 +188,7 @@ pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> Clear
     master_key
 }
 
+/// Deterministially generate a password for a site.
 pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: SiteType,
         site_counter: u32, site_variant: SiteVariant, site_context: &[u8]) -> ClearOnDrop<String> {
     let mut site_password_salt = Vec::new();

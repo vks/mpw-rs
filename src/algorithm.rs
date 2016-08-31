@@ -9,7 +9,7 @@ extern crate byteorder;
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 
-use self::ring::{digest, hmac};
+use self::ring::{aead, digest, hmac, rand};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
 use self::hex::ToHex;
 use self::byteorder::{BigEndian, WriteBytesExt};
@@ -340,6 +340,44 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
     identicon
 }
 
+const NONCE_LEN: usize = 12;
+
+/// Encrypt data using the master key.
+///
+/// This is not specified by the Master Password algorithm.
+pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
+    assert!(buffer.len() >=
+            NONCE_LEN + clear_text.len() + aead::MAX_OVERHEAD_LEN);
+
+    {
+        let (mut nonce, mut rest) = buffer.split_at_mut(NONCE_LEN);
+        let (mut input, _) = rest.split_at_mut(clear_text.len());
+
+        let rng = rand::SystemRandom::new();
+        rng.fill(nonce).expect("failed to generate random nonce");
+
+        input.clone_from_slice(clear_text);
+    }
+
+    let key = aead::SealingKey::new(&aead::CHACHA20_POLY1305, &master_key[0..32])
+        .expect("invalid CHACHA20_POLY1305 key");
+    let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
+    aead::seal_in_place(&key, nonce, in_out, aead::MAX_OVERHEAD_LEN, &[])
+        .expect("failed to encrypt password");
+}
+
+/// Decrypt data using the master key.
+///
+/// This is not specified by the Master Password algorithm.
+pub fn decrypt<'a>(master_key: &[u8; 64], buffer: &'a mut [u8]) -> &'a [u8] {
+    let key = aead::OpeningKey::new(&aead::CHACHA20_POLY1305, &master_key[0..32])
+        .expect("invalid CHACHA20_POLY1305 key");
+    let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
+    let len = aead::open_in_place(&key, nonce, 0, in_out, &[])
+        .expect("failed to decrypt password");
+    &in_out[0..len]
+}
+
 #[test]
 fn test_key_for_user_v3() {
     let full_name = "John Doe";
@@ -416,4 +454,14 @@ fn test_unicode_site_name() {
         SiteVariant::Password, &[]
     );
     assert_eq!(*password, "ZajmGabl0~Zoza");
+}
+
+#[test]
+fn test_encryption() {
+    let clear_text = b"This is a secret.";
+    let key = [1; 64];
+    let mut buffer = vec![0; NONCE_LEN + clear_text.len() + aead::MAX_OVERHEAD_LEN];
+    encrypt(clear_text, &key, &mut buffer);
+    let decrypted = decrypt(&key, &mut buffer);
+    assert_eq!(clear_text, decrypted);
 }

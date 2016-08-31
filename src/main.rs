@@ -1,4 +1,4 @@
-#![feature(try_from, custom_derive, plugin, question_mark)]
+#![feature(try_from, custom_derive, plugin, question_mark, core_intrinsics)]
 #![plugin(serde_macros)]
 
 #[macro_use]

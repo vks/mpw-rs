@@ -1,9 +1,10 @@
-extern crate crypto;
+extern crate libc;
 
 use std::convert::AsMut;
 use std::ops::{Deref, DerefMut};
+use std::intrinsics;
 
-use self::crypto::util::secure_memset;
+use self::libc::c_void;
 
 /// A cheap, mutable reference-to-mutable reference conversion.
 ///
@@ -44,6 +45,7 @@ impl UnsafeAsMut for String {
 /// A container representing a byte slice that is set to zero on drop.
 ///
 /// Useful to make sure that secret data is cleared from memory after use.
+// TODO: Make sure the string is not swapped by using mman::mlock.
 #[derive(Debug)]
 pub struct ClearOnDrop<T: UnsafeAsMut> {
     container: T
@@ -71,10 +73,12 @@ impl<T: UnsafeAsMut> DerefMut for ClearOnDrop<T> {
 
 impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
     fn drop(&mut self) {
-        // We use crypto's implementation of memset that makes sure it is not
-        // optimized away. It is safe to overwrite strings with zeros, because
-        // it is valid UTF-8.
-        secure_memset(unsafe { self.container.as_mut() }, 0);
+        // We use a volatile memset that makes sure it is not optimized away. It
+        // is safe to overwrite strings with zeros, because it is valid UTF-8.
+        unsafe {
+            let slice = self.container.as_mut();
+            intrinsics::volatile_set_memory(slice.as_ptr() as *mut c_void, 0, slice.len());
+        }
     }
 }
 

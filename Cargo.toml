@@ -7,7 +7,6 @@ readme = "README.md"
 license = "MIT"
 
 [dependencies]
-rust-crypto = "0.2"
 lazy_static = "0.2"
 byteorder = "0.5"
 rpassword = "0.2"
@@ -16,6 +15,7 @@ serde_macros = "0.8"
 ring = "0.4"
 ring-pwhash = "0.1"
 hex = "0.2"
+libc = "0.2"
 
 [dependencies.toml]
 version = "0.2"

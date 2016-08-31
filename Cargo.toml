@@ -13,6 +13,9 @@ byteorder = "0.5"
 rpassword = "0.2"
 serde = "0.8"
 serde_macros = "0.8"
+ring = "0.4"
+ring-pwhash = "0.1"
+hex = "0.2"
 
 [dependencies.toml]
 version = "0.2"

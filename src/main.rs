@@ -11,7 +11,7 @@ extern crate serde;
 use std::io::{Read, Write};
 use std::fs::File;
 
-use clap::{Arg, App};
+use clap::{Arg, App, AppSettings};
 use rpassword::read_password;
 
 mod algorithm;
@@ -37,6 +37,7 @@ fn main() {
     let matches = App::new("Master Password")
         .about("A stateless password management solution.")
         .version(crate_version!())
+        .setting(AppSettings::HidePossibleValuesInHelp)
         .arg(Arg::with_name("site")
              .help("The domain name of the site.")
              .number_of_values(1)
@@ -44,7 +45,7 @@ fn main() {
         .arg(Arg::with_name("full name")
              .long("name")
              .short("u")
-             .help("The full name of the user. Optional if given in config.")
+             .help("The full name of the user.{n}Optional if given in config.")
              .required_unless("config")
              .number_of_values(1)
              .takes_value(true))
@@ -74,7 +75,12 @@ fn main() {
         .arg(Arg::with_name("variant")
              .long("variant")
              .short("v")
-             .help("The kind of content to generate.")
+             .help("The kind of content to generate (defaults to 'password'){n}\
+                    {n}\
+                    p, password  Generate a password{n}\
+                    l, login     Generate a login name{n}\
+                    a, answer    Generate an answer to a question")
+             .next_line_help(true)
              .takes_value(true)
              .number_of_values(1)
              .possible_values(&[

@@ -46,6 +46,7 @@ impl UnsafeAsMut for String {
 ///
 /// Useful to make sure that secret data is cleared from memory after use.
 // TODO: Make sure the string is not swapped by using mman::mlock.
+// TODO: Investigate mprotect.
 #[derive(Debug)]
 pub struct ClearOnDrop<T: UnsafeAsMut> {
     container: T

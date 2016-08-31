@@ -25,3 +25,5 @@ your own risk.
 * Losing your master password compromises all passwords
   (for traditional managers you would have to lose your master password *and*
   the stored passwords)
+* You can't use custom passwords
+* You can't use custom password generation templates

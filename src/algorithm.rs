@@ -3,7 +3,7 @@
 
 extern crate ring;
 extern crate ring_pwhash;
-extern crate hex;
+extern crate data_encoding;
 extern crate byteorder;
 
 use std::io::Write;
@@ -11,7 +11,7 @@ use std::convert::{TryInto, TryFrom};
 
 use self::ring::{aead, digest, hmac, rand};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
-use self::hex::ToHex;
+use self::data_encoding::{hex, base64};
 use self::byteorder::{BigEndian, WriteBytesExt};
 
 use clear_on_drop::ClearOnDrop;
@@ -308,7 +308,7 @@ fn character_from_class(class: char, seed_byte: u8) -> char {
 /// Encode a fingerprint for a buffer.
 pub fn id_for_buf(buf: &[u8]) -> String {
     let digest = digest::digest(&digest::SHA256, buf);
-    digest.as_ref().to_hex()
+    hex::encode(digest.as_ref())
 }
 
 /// Encode a visual fingerprint for a user.

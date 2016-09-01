@@ -45,8 +45,12 @@ impl<'a> Config<'a> {
         if other.full_name.is_some() {
             self.full_name = other.full_name;
         }
-        if let Some(sites) = other.sites {
-            self.sites.as_mut().map(|mut s| s.extend(sites));
+        if let Some(other_sites) = other.sites {
+            if let Some(ref mut sites) = self.sites {
+                sites.extend(other_sites);
+            } else {
+                self.sites = Some(other_sites);
+            }
         }
     }
 }
@@ -122,8 +126,25 @@ impl<'a> Site<'a> {
             counter: config.counter.unwrap_or(1),
             variant: variant,
             context: context,
+            encrypted: encrypted,
         }
     }
+}
+
+#[test]
+fn test_config_merge() {
+    let mut c1 = Config::new();
+    let mut c2 = Config::new();
+    let mut c3 = Config::new();
+
+    let wikipedia = SiteConfig::new("wikipedia.org");
+    let github = SiteConfig::new("github.com");
+    c2.sites = Some(vec![wikipedia.clone()]);
+    c3.sites = Some(vec![github.clone()]);
+    c1.merge(c2);
+    assert_eq!(c1.sites, Some(vec![wikipedia.clone()]));
+    c1.merge(c3);
+    assert_eq!(c1.sites, Some(vec![wikipedia, github]));
 }
 
 #[test]

@@ -138,13 +138,15 @@ fn main() {
         .arg(Arg::with_name("replace")
              .long("replace")
              .short("r")
-             .help("Replace parameters of all site passwords in configuration file.")
+             .help("Replace parameters of all site passwords in configuration file.{n}\
+                    Does not delete stored passwords.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "delete", "store"]))
         .arg(Arg::with_name("delete")
              .long("delete")
              .short("D")
-             .help("Delete parameters of all site passwords in configuration file.")
+             .help("Delete parameters of all site passwords in configuration file.{n}\
+                    Does not delete stored passwords.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "replace", "store"]))
         .arg(Arg::with_name("store")
@@ -188,10 +190,12 @@ fn main() {
     }
 
     if matches.is_present("replace") || matches.is_present("delete") {
-        // Remove all sites that have the given name.
+        // Remove all sites that have the given name, unless they stored a
+        // password.
         let param_site_name = param_site_name.unwrap();
         if let Some(ref mut sites) = config.sites {
-            sites.retain(|ref s| s.name != param_site_name);
+            sites.retain(|ref s|
+                s.name != param_site_name || s.encrypted.is_some());
         }
     }
 

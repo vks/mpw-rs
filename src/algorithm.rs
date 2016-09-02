@@ -94,8 +94,7 @@ pub enum SiteType {
     GeneratedPIN,
     GeneratedName,
     GeneratedPhrase,
-    StoredPersonal,
-    StoredDevicePrivate,
+    Stored,
 }
 
 impl SiteType {
@@ -121,7 +120,7 @@ impl SiteType {
             "p" | "phrase"
                 => Some(SiteType::GeneratedPhrase),
             "stored"
-                => Some(SiteType::StoredPersonal),
+                => Some(SiteType::Stored),
             _ => None,
         }
     }
@@ -140,8 +139,7 @@ impl ::serde::Serialize for SiteType {
             SiteType::GeneratedPIN => "pin",
             SiteType::GeneratedName => "name",
             SiteType::GeneratedPhrase => "phrase",
-            SiteType::StoredPersonal => "stored",
-            _ => unimplemented!(),
+            SiteType::Stored => "stored",
         })
     }
 }
@@ -263,7 +261,7 @@ fn templates_for_type(ty: SiteType) -> Vec<&'static str> {
         SiteType::GeneratedPhrase => vec![
             "cvcc cvc cvccvcv cvc", "cvc cvccvcvcv cvcv", "cv cvccv cvc cvcvccv",
         ],
-        SiteType::StoredPersonal | SiteType::StoredDevicePrivate
+        SiteType::Stored
             => panic!("Expected generated type"),
     }
 }

@@ -124,11 +124,11 @@ impl<'a> Site<'a> {
                     SiteVariant::Answer => SiteType::GeneratedPhrase,
                 }
             } else {
-                SiteType::StoredPersonal
+                SiteType::Stored
             }
         );
         if encrypted.is_some() {
-            assert_eq!(type_, SiteType::StoredPersonal);
+            assert_eq!(type_, SiteType::Stored);
         }
         let context = match config.context {
             Some(ref s) => s.as_ref().into(),

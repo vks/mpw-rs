@@ -225,7 +225,7 @@ fn main() {
             site.encrypted = Some(
                 base64::encode(&buffer).into()
             );
-            site.type_ = Some(SiteType::StoredPersonal);
+            site.type_ = Some(SiteType::Stored);
             master_key = Some(key);
         }
         config.merge(param_config);
@@ -278,7 +278,7 @@ fn main() {
         let mut buffer = ClearOnDrop::new(vec![]);
         let password_string;
         let password = match site.type_ {
-            SiteType::StoredPersonal => {
+            SiteType::Stored => {
                 let encrypted = site.encrypted.as_ref()
                     .expect("found stored password without 'encrypted' field")
                     .as_bytes();
@@ -288,9 +288,6 @@ fn main() {
                 buffer.clone_from_slice(decoded);
                 let decrypted = decrypt(&master_key, &mut buffer);
                 std::str::from_utf8(decrypted).expect("could not decrypt stored password")
-            },
-            SiteType::StoredDevicePrivate => {
-                unimplemented!()
             },
             _ => {
                 password_string = password_for_site_v3(

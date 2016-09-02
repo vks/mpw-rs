@@ -125,7 +125,7 @@ fn main() {
              .help("Dump the configuration as a TOML."))
         .arg(Arg::with_name("config")
              .long("config")
-             .short("f")
+             .short("i")
              .help("Read configuration from a TOML file.")
              .takes_value(true)
              .number_of_values(1))
@@ -208,7 +208,8 @@ fn main() {
         if let (Some(config_name), Some(param_name)) =
             (config.full_name.as_ref(), param_config.full_name.as_ref())
         {
-            assert_eq!(config_name, param_name);
+            assert_eq!(config_name, param_name,
+                       "full name given as paramater conflicts with config");
         }
         if matches.is_present("store") {
             let full_name = merge_options(

@@ -6,7 +6,7 @@ use algorithm::{SiteType, SiteVariant};
 
 
 /// Merge two options, prefering Some and the new one.
-fn merge_options<T>(old: Option<T>, new: Option<T>) -> Option<T> {
+pub fn merge_options<T>(old: Option<T>, new: Option<T>) -> Option<T> {
     match (old.is_some(), new.is_some()) {
         (true, true) => new,
         (true, false) => old,
@@ -64,6 +64,7 @@ pub struct SiteConfig<'a> {
     pub counter: Option<u32>,
     pub variant: Option<SiteVariant>,
     pub context: Option<Cow<'a, str>>,
+    pub encrypted: Option<Cow<'a, str>>,
 }
 
 impl<'a> SiteConfig<'a> {
@@ -75,6 +76,7 @@ impl<'a> SiteConfig<'a> {
             counter: None,
             variant: None,
             context: None,
+            encrypted: None,
         }
     }
 
@@ -88,6 +90,7 @@ impl<'a> SiteConfig<'a> {
         self.type_ = merge_options(self.type_, other.type_);
         self.counter = merge_options(self.counter, other.counter);
         self.variant = merge_options(self.variant, other.variant);
+        assert!(self.encrypted.is_none() && other.encrypted.is_none());
         if other.context.is_some() {
             self.context = other.context;
         }
@@ -102,6 +105,7 @@ pub struct Site<'a> {
     pub counter: u32,
     pub variant: SiteVariant,
     pub context: Cow<'a, str>,
+    pub encrypted: Option<Cow<'a, str>>,
 }
 
 impl<'a> Site<'a> {
@@ -118,6 +122,10 @@ impl<'a> Site<'a> {
         let context = match config.context {
             Some(ref s) => s.as_ref().into(),
             None => "".into(),
+        };
+        let encrypted = match config.encrypted {
+            Some(ref s) => Some(s.as_ref().into()),
+            None => None,
         };
 
         Site {

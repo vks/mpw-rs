@@ -119,6 +119,8 @@ impl SiteType {
                 => Some(SiteType::GeneratedName),
             "p" | "phrase"
                 => Some(SiteType::GeneratedPhrase),
+            "stored"
+                => Some(SiteType::StoredPersonal),
             _ => None,
         }
     }
@@ -137,6 +139,7 @@ impl ::serde::Serialize for SiteType {
             SiteType::GeneratedPIN => "pin",
             SiteType::GeneratedName => "name",
             SiteType::GeneratedPhrase => "phrase",
+            SiteType::StoredPersonal => "stored",
             _ => unimplemented!(),
         })
     }
@@ -377,6 +380,7 @@ pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
 pub fn decrypt<'a>(master_key: &[u8; 64], buffer: &'a mut [u8]) -> &'a [u8] {
     let key = aead::OpeningKey::new(&aead::CHACHA20_POLY1305, &master_key[0..32])
         .expect("invalid CHACHA20_POLY1305 key");
+    assert!(buffer.len() > NONCE_LEN, "invalid cipher text");
     let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
     let len = aead::open_in_place(&key, nonce, 0, in_out, &[])
         .expect("failed to decrypt password");

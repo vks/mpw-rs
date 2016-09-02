@@ -112,20 +112,27 @@ impl<'a> Site<'a> {
     /// Create a site from a given config. Missing values are filled with defaults.
     pub fn from_config(config: &'a SiteConfig<'a>) -> Site<'a> {
         let variant = config.variant.unwrap_or(SiteVariant::Password);
-        let type_ = config.type_.unwrap_or(
-            match variant {
-                SiteVariant::Password => SiteType::GeneratedLong,
-                SiteVariant::Login => SiteType::GeneratedName,
-                SiteVariant::Answer => SiteType::GeneratedPhrase,
-            }
-        );
-        let context = match config.context {
-            Some(ref s) => s.as_ref().into(),
-            None => "".into(),
-        };
         let encrypted = match config.encrypted {
             Some(ref s) => Some(s.as_ref().into()),
             None => None,
+        };
+        let type_ = config.type_.unwrap_or(
+            if encrypted.is_none() {
+                match variant {
+                    SiteVariant::Password => SiteType::GeneratedLong,
+                    SiteVariant::Login => SiteType::GeneratedName,
+                    SiteVariant::Answer => SiteType::GeneratedPhrase,
+                }
+            } else {
+                SiteType::StoredPersonal
+            }
+        );
+        if encrypted.is_some() {
+            assert_eq!(type_, SiteType::StoredPersonal);
+        }
+        let context = match config.context {
+            Some(ref s) => s.as_ref().into(),
+            None => "".into(),
         };
 
         Site {

@@ -216,9 +216,11 @@ fn main() {
             let password = get_site_password();
             let mut buffer = vec![0; min_buffer_len(password.len())];
             encrypt(password.as_ref(), &key, &mut buffer);
-            param_config.sites.as_mut().unwrap()[0].encrypted = Some(
+            let ref mut site = param_config.sites.as_mut().unwrap()[0];
+            site.encrypted = Some(
                 base64::encode(&buffer).into()
             );
+            site.type_ = Some(SiteType::StoredPersonal);
             master_key = Some(key);
         }
         config.merge(param_config);
@@ -250,7 +252,11 @@ fn main() {
     let full_name = config.full_name.as_ref()
         .expect("need full name to generate master key");
 
-    let master_key = if let Some(key) = master_key { key } else { generate_master_key(full_name) };
+    let master_key = if let Some(key) = master_key {
+        key
+    } else {
+        generate_master_key(full_name)
+    };
 
     // Generate or decrypt passwords.
     for site_config in config.sites.as_ref().unwrap().iter() {
@@ -262,22 +268,38 @@ fn main() {
                 continue;
             }
         }
+        // We have to define the containers of the passwords here, so that the
+        // slices into them survive until we print the password.
+        let mut buffer = ClearOnDrop::new(vec![]);
+        let password_string;
         let password = match site.type_ {
-            SiteType::StoredPersonal | SiteType::StoredDevicePrivate => {
+            SiteType::StoredPersonal => {
+                let encrypted = site.encrypted.as_ref()
+                    .expect("found stored password without 'encrypted' field")
+                    .as_bytes();
+                let decoded = &base64::decode(encrypted)
+                    .expect("could not decode 'encrypted' field");
+                buffer.resize(decoded.len(), 0);
+                buffer.clone_from_slice(decoded);
+                let decrypted = decrypt(&master_key, &mut buffer);
+                std::str::from_utf8(decrypted).expect("could not decrypt stored password")
+            },
+            SiteType::StoredDevicePrivate => {
                 unimplemented!()
             },
             _ => {
-                password_for_site_v3(
+                password_string = password_for_site_v3(
                     &master_key,
                     site.name.as_bytes(),
                     site.type_,
                     site.counter,
                     site.variant,
                     site.context.as_bytes()
-                )
+                );
+                &password_string
             },
         };
         // TODO: print non-default parameters
-        println!("Password for {}: {}", site.name, *password);
+        println!("Password for {}: {}", site.name, password);
     }
 }

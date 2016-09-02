@@ -8,6 +8,7 @@ extern crate byteorder;
 
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
+use std::cmp::max;
 
 use self::ring::{aead, digest, hmac, rand};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
@@ -343,11 +344,55 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
     identicon
 }
 
+/// Length of the nonce of the used encryption algorithm (chacha20).
 const NONCE_LEN: usize = 12;
+/// Length to which short passwords are padded before encryption.
+///
+/// This is chosen to be the same length as the longest generated password.
+/// Note that this has to be smaller than 256 due to how he padding is done.
+const PAD_LEN: usize = 20;
+
+/// Calculate the length of the clear text after padding.
+fn padded_len(clear_text_len: usize) -> usize {
+    max(clear_text_len + 1, PAD_LEN)
+}
 
 /// Calculate the minimal length of the encryption buffer.
 pub fn min_buffer_len(clear_text_len: usize) -> usize {
-    clear_text_len + NONCE_LEN + aead::MAX_OVERHEAD_LEN
+    padded_len(clear_text_len) + NONCE_LEN + aead::MAX_OVERHEAD_LEN
+}
+
+/// Pad the password of length `len` to a minimal length `PAD_LEN`.
+///
+/// Panics if the buffer is too short.
+///
+/// This is to avoid making it possible to gain information on the length of
+/// short passwords.
+fn pad(buf: &mut [u8], len: usize) {
+    let make_message = |need, got|
+        format!("padding buffer too short: need {}, got {}", need, got);
+    assert!(buf.len() >= PAD_LEN, make_message(PAD_LEN, buf.len()));
+    assert!(buf.len() >= len + 1, make_message(len + 1, buf.len()));
+    let padding_byte = if len >= PAD_LEN { 0 } else { (PAD_LEN - len).try_into().unwrap() };
+    for b in &mut buf[len..] {
+        *b = padding_byte;
+    }
+}
+
+/// Remove the padding from a password.
+///
+/// This is the inverse of `pad`.
+fn unpad(buf: &[u8]) -> &[u8] {
+    let padding_byte = buf[buf.len() - 1];
+    let padding_size = usize::from(padding_byte);
+    for byte in &buf[buf.len() - padding_size..] {
+        assert_eq!(*byte, padding_byte);
+    }
+    if padding_byte != 0 {
+        &buf[0..buf.len() - padding_size]
+    } else {
+        &buf[0..buf.len() - 1]
+    }
 }
 
 /// Encrypt data using the master key.
@@ -358,12 +403,19 @@ pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
 
     {
         let (mut nonce, mut rest) = buffer.split_at_mut(NONCE_LEN);
-        let (mut input, _) = rest.split_at_mut(clear_text.len());
 
         let rng = rand::SystemRandom::new();
         rng.fill(nonce).expect("failed to generate random nonce");
 
-        input.clone_from_slice(clear_text);
+        {
+            let (mut input, _) = rest.split_at_mut(clear_text.len());
+            input.clone_from_slice(clear_text);
+        }
+
+        // Pad short passwords so their length cannot be guessed by looking
+        // at the cipher text.
+        let (mut input, _) = rest.split_at_mut(padded_len(clear_text.len()));
+        pad(&mut input, clear_text.len());
     }
 
     let key = aead::SealingKey::new(&aead::CHACHA20_POLY1305, &master_key[0..32])
@@ -384,7 +436,8 @@ pub fn decrypt<'a>(master_key: &[u8; 64], buffer: &'a mut [u8]) -> &'a [u8] {
     let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
     let len = aead::open_in_place(&key, nonce, 0, in_out, &[])
         .expect("failed to decrypt password");
-    &in_out[0..len]
+    let padded = &in_out[0..len];
+    unpad(padded)
 }
 
 #[test]
@@ -466,10 +519,31 @@ fn test_unicode_site_name() {
 }
 
 #[test]
+fn test_padding_short() {
+    let mut vec = vec![1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    pad(&mut vec, 5);
+    assert_eq!(&vec,
+        &[1, 2, 3, 4, 5, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15]);
+    assert_eq!(unpad(&vec), &[1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn test_padding_long() {
+    for &len in &[PAD_LEN, PAD_LEN + 1] {
+        let mut vec = vec![100; len + 1];
+        pad(&mut vec, len);
+        let mut expected = vec![100; len + 1];
+        expected[len] = 0;
+        assert_eq!(&vec, &expected);
+        assert_eq!(unpad(&vec), &vec![100; len][..]);
+    }
+}
+
+#[test]
 fn test_encryption() {
     let clear_text = b"This is a secret.";
     let key = [1; 64];
-    let mut buffer = vec![0; NONCE_LEN + clear_text.len() + aead::MAX_OVERHEAD_LEN];
+    let mut buffer = vec![0; min_buffer_len(clear_text.len())];
     encrypt(clear_text, &key, &mut buffer);
     let decrypted = decrypt(&key, &mut buffer);
     assert_eq!(clear_text, decrypted);

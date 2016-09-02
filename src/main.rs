@@ -7,16 +7,19 @@ extern crate lazy_static;
 extern crate clap;
 extern crate rpassword;
 extern crate serde;
+extern crate data_encoding;
 
 use std::io::{Read, Write};
 use std::fs::File;
 
 use clap::{Arg, App, AppSettings};
 use rpassword::read_password;
+use data_encoding::base64;
 
 mod algorithm;
 use algorithm::*;
 mod clear_on_drop;
+use clear_on_drop::ClearOnDrop;
 mod config;
 use config::*;
 
@@ -33,6 +36,27 @@ i, pin            4 numbers.{n}\
 n, name           9 letter name.{n}\
 p, phrase         20 character sentence.{n}";
 
+fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
+    print!("Please enter the master password: ");
+    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
+    let master_password = read_password().expect("could not read master password");
+
+    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
+    println!("Identicon: {}", identicon);
+    let master_key = master_key_for_user_v3(
+        full_name.as_bytes(),
+        master_password.as_bytes()
+    );
+    master_key
+}
+
+fn get_site_password() -> ClearOnDrop<String> {
+    print!("Please enter the site password to be stored: ");
+    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
+    let password = read_password().expect("could not read site password");
+    ClearOnDrop::new(password)
+}
+
 fn main() {
     let matches = App::new("Master Password")
         .about("A stateless password management solution.")
@@ -41,7 +65,8 @@ fn main() {
         .arg(Arg::with_name("site")
              .help("The domain name of the site.")
              .number_of_values(1)
-             .index(1))
+             .index(1)
+             .required_unless("config"))
         .arg(Arg::with_name("full name")
              .long("name")
              .short("u")
@@ -109,19 +134,25 @@ fn main() {
              .short("a")
              .help("Add parameters of site password to configuration file.")
              .requires_all(&["site", "config"])
-             .conflicts_with_all(&["replace", "delete"]))
+             .conflicts_with_all(&["replace", "delete", "store"]))
         .arg(Arg::with_name("replace")
              .long("replace")
              .short("r")
              .help("Replace parameters of all site passwords in configuration file.")
              .requires_all(&["site", "config"])
-             .conflicts_with_all(&["add", "delete"]))
+             .conflicts_with_all(&["add", "delete", "store"]))
         .arg(Arg::with_name("delete")
              .long("delete")
              .short("D")
              .help("Delete parameters of all site passwords in configuration file.")
              .requires_all(&["site", "config"])
-             .conflicts_with_all(&["add", "replace"]))
+             .conflicts_with_all(&["add", "replace", "store"]))
+        .arg(Arg::with_name("store")
+             .long("store")
+             .short("s")
+             .help("Encrypt and store a password")
+             .requires_all(&["site", "config"])
+             .conflicts_with_all(&["add", "delete", "replace"]))
         .set_term_width(0)
         .get_matches();
 
@@ -139,6 +170,7 @@ fn main() {
         Config::new()
     };
 
+    // Read config from CLI parameters.
     let mut param_config = Config::new();
     param_config.full_name = matches.value_of("full name").map(Into::into);
     let param_site_name = matches.value_of("site");
@@ -150,6 +182,7 @@ fn main() {
             .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
             variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
             context: matches.value_of("context").map(Into::into),
+            encrypted: None,
         };
         param_config.sites = Some(vec![param_site_config]);
     }
@@ -162,19 +195,39 @@ fn main() {
         }
     }
 
+    let mut master_key = None;
     if matches.is_present("add") ||
-       matches.is_present("replace") {
+       matches.is_present("replace") ||
+       matches.is_present("store") ||
+       !matches.is_present("config") {
+        // Merge parameters into config.
         if let (Some(config_name), Some(param_name)) =
             (config.full_name.as_ref(), param_config.full_name.as_ref())
         {
             assert_eq!(config_name, param_name);
+        }
+        if matches.is_present("store") {
+            let full_name = merge_options(
+                config.full_name.as_ref(),
+                param_config.full_name.as_ref(),
+            ).expect("need full name to generate master key");
+            let key = generate_master_key(full_name);
+
+            let password = get_site_password();
+            let mut buffer = vec![0; min_buffer_len(password.len())];
+            encrypt(password.as_ref(), &key, &mut buffer);
+            param_config.sites.as_mut().unwrap()[0].encrypted = Some(
+                base64::encode(&buffer).into()
+            );
+            master_key = Some(key);
         }
         config.merge(param_config);
     }
 
     if matches.is_present("add") ||
        matches.is_present("replace") ||
-       matches.is_present("delete") {
+       matches.is_present("delete") ||
+       matches.is_present("store") {
         // Overwrite config file.
         let s = config.encode();
         assert!(s != "");
@@ -194,23 +247,12 @@ fn main() {
         return;
     }
 
-
-    // Generate password from master key.
-
     let full_name = config.full_name.as_ref()
         .expect("need full name to generate master key");
 
-    print!("Please enter the master password: ");
-    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
-    let master_password = read_password().expect("could not read password");
+    let master_key = if let Some(key) = master_key { key } else { generate_master_key(full_name) };
 
-    let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
-    println!("Identicon: {}", identicon);
-    let master_key = master_key_for_user_v3(
-        full_name.as_bytes(),
-        master_password.as_bytes()
-    );
-
+    // Generate or decrypt passwords.
     for site_config in config.sites.as_ref().unwrap().iter() {
         let site = Site::from_config(site_config);
         // If a site was given, skip all other sites.
@@ -220,15 +262,22 @@ fn main() {
                 continue;
             }
         }
-        let generated_password = password_for_site_v3(
-            &master_key,
-            site.name.as_bytes(),
-            site.type_,
-            site.counter,
-            site.variant,
-            site.context.as_bytes()
-        );
+        let password = match site.type_ {
+            SiteType::StoredPersonal | SiteType::StoredDevicePrivate => {
+                unimplemented!()
+            },
+            _ => {
+                password_for_site_v3(
+                    &master_key,
+                    site.name.as_bytes(),
+                    site.type_,
+                    site.counter,
+                    site.variant,
+                    site.context.as_bytes()
+                )
+            },
+        };
         // TODO: print non-default parameters
-        println!("Password for {}: {}", site.name, *generated_password);
+        println!("Password for {}: {}", site.name, *password);
     }
 }

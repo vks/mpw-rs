@@ -11,7 +11,7 @@ use std::convert::{TryInto, TryFrom};
 
 use self::ring::{aead, digest, hmac, rand};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
-use self::data_encoding::{hex, base64};
+use self::data_encoding::hex;
 use self::byteorder::{BigEndian, WriteBytesExt};
 
 use clear_on_drop::ClearOnDrop;
@@ -212,7 +212,7 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
 
     let template = template_for_type(site_type, site_password_seed[0]);
     if template.len() > 32 {
-        panic!("Template to long for password seed");
+        panic!("Template too long for password seed");
     }
 
     // Encode the password from the seed using the template.
@@ -342,12 +342,16 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
 
 const NONCE_LEN: usize = 12;
 
+/// Calculate the minimal length of the encryption buffer.
+pub fn min_buffer_len(clear_text_len: usize) -> usize {
+    clear_text_len + NONCE_LEN + aead::MAX_OVERHEAD_LEN
+}
+
 /// Encrypt data using the master key.
 ///
 /// This is not specified by the Master Password algorithm.
 pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
-    assert!(buffer.len() >=
-            NONCE_LEN + clear_text.len() + aead::MAX_OVERHEAD_LEN);
+    assert!(buffer.len() >= min_buffer_len(clear_text.len()));
 
     {
         let (mut nonce, mut rest) = buffer.split_at_mut(NONCE_LEN);
@@ -367,6 +371,7 @@ pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
 }
 
 /// Decrypt data using the master key.
+/// Decryption is in-place, a slice to the decrypted clear text is returned.
 ///
 /// This is not specified by the Master Password algorithm.
 pub fn decrypt<'a>(master_key: &[u8; 64], buffer: &'a mut [u8]) -> &'a [u8] {

@@ -24,7 +24,7 @@ default-features = false
 features = ["serde"]
 
 [dependencies.clap]
-version = "2"
+version = "2.11.2"
 features = ["unstable", "color"]
 
 [profile.dev]

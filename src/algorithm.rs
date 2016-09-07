@@ -440,7 +440,7 @@ fn unpad(buf: &[u8]) -> &[u8] {
     let padding_byte = buf[buf.len() - 1];
     let padding_size = usize::from(padding_byte);
     for byte in &buf[buf.len() - padding_size..] {
-        assert_eq!(*byte, padding_byte);
+        debug_assert_eq!(*byte, padding_byte);
     }
     if padding_byte != 0 {
         &buf[0..buf.len() - padding_size]

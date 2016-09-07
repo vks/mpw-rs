@@ -51,7 +51,7 @@ fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap_or_exit("could not generate master key");
     master_key
 }
 
@@ -340,7 +340,7 @@ fn main() {
                     site.counter,
                     site.variant,
                     site.context.as_bytes()
-                );
+                ).unwrap_or_exit("could not generate site password");
                 &password_string
             },
         };

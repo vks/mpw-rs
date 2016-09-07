@@ -6,6 +6,8 @@ extern crate ring_pwhash;
 extern crate data_encoding;
 extern crate byteorder;
 
+use std::io;
+use std::error::Error as StdError;
 use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 use std::cmp::max;
@@ -175,58 +177,106 @@ fn scope_for_variant(variant: SiteVariant) -> &'static str {
     }
 }
 
+/// Master Password algorithm kind of error.
+#[derive(Debug, Clone, Copy)]
+pub enum ErrorKind {
+    /// An `std::io::Error` occured.
+    Io,
+    /// The full name was longer than 2^32 bytes.
+    FullNameTooLong,
+    /// The site name was longer than 2^32 bytes.
+    SiteNameTooLong,
+    /// The site context was longer than 2^32 bytes.
+    SiteContextTooLong,
+}
+
+/// Master Password algorithm error.
+#[derive(Debug)]
+pub struct Error {
+    // TODO: maybe rather use Cow?
+    pub message: String,
+    pub kind: ErrorKind,
+}
+
+impl From<ErrorKind> for Error {
+    fn from(kind: ErrorKind) -> Error {
+        let message = match kind {
+            ErrorKind::Io => "IO error",
+            ErrorKind::FullNameTooLong => "full name too long",
+            ErrorKind::SiteNameTooLong => "site name too long",
+            ErrorKind::SiteContextTooLong => "site context too long",
+        };
+        Error { message: message.into(), kind: kind }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error {
+            message: e.description().into(),
+            kind: ErrorKind::Io,
+        }
+    }
+}
+
 /// Derive a master key from a full name and a master password.
-pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8]) -> ClearOnDrop<[u8; 64]> {
+pub fn master_key_for_user_v3(full_name: &[u8], master_password: &[u8])
+    -> Result<ClearOnDrop<[u8; 64]>, Error>
+{
     let mut master_key_salt = Vec::new();
-    master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes()).unwrap();
-    let master_key_salt_len = full_name.len().try_into().unwrap();
-    master_key_salt.write_u32::<BigEndian>(master_key_salt_len).unwrap();
-    master_key_salt.write_all(full_name).unwrap();
+    master_key_salt.write_all(scope_for_variant(SiteVariant::Password).as_bytes())?;
+    let master_key_salt_len = full_name.len().try_into().map_err(|_|
+        Error::from(ErrorKind::FullNameTooLong))?;
+    master_key_salt.write_u32::<BigEndian>(master_key_salt_len)?;
+    master_key_salt.write_all(full_name)?;
     assert!(!master_key_salt.is_empty());
 
     let mut master_key = ClearOnDrop::new([0; 64]);
     scrypt(master_password, &master_key_salt, &SCRYPT_PARAMS, &mut *master_key);
 
-    master_key
+    Ok(master_key)
 }
 
 /// Deterministially generate a password for a site.
 pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: SiteType,
-        site_counter: u32, site_variant: SiteVariant, site_context: &[u8]) -> ClearOnDrop<String> {
+        site_counter: u32, site_variant: SiteVariant, site_context: &[u8])
+    -> Result<ClearOnDrop<String>, Error>
+{
     let mut site_password_salt = Vec::new();
     let site_scope = scope_for_variant(site_variant).as_bytes();
-    site_password_salt.write_all(site_scope).unwrap();
-    let site_name_len = site_name.len().try_into().unwrap();
-    site_password_salt.write_u32::<BigEndian>(site_name_len).unwrap();
-    site_password_salt.write_all(site_name).unwrap();
-    site_password_salt.write_u32::<BigEndian>(site_counter).unwrap();
+    site_password_salt.write_all(site_scope)?;
+    let site_name_len = site_name.len().try_into().map_err(|_|
+        Error::from(ErrorKind::SiteNameTooLong))?;
+    site_password_salt.write_u32::<BigEndian>(site_name_len)?;
+    site_password_salt.write_all(site_name)?;
+    site_password_salt.write_u32::<BigEndian>(site_counter)?;
     if !site_context.is_empty() {
-        let site_context_len = site_context.len().try_into().unwrap();
-        site_password_salt.write_u32::<BigEndian>(site_context_len).unwrap();
-        site_password_salt.write_all(site_context).unwrap();
+        let site_context_len = site_context.len().try_into().map_err(|_|
+            Error::from(ErrorKind::SiteContextTooLong))?;
+        site_password_salt.write_u32::<BigEndian>(site_context_len)?;
+        site_password_salt.write_all(site_context)?;
     }
-    assert!(!site_password_salt.is_empty());
+    debug_assert!(!site_password_salt.is_empty());
 
     let signing_key = hmac::SigningKey::new(&digest::SHA256, master_key);
     let digest = hmac::sign(&signing_key, &site_password_salt);
     let site_password_seed = digest.as_ref();
-    assert!(!site_password_seed.is_empty());
+    debug_assert!(!site_password_seed.is_empty());
 
     let template = template_for_type(site_type, site_password_seed[0]);
     if template.len() > 32 {
-        panic!("Template too long for password seed");
+        panic!("template too long for password seed");
     }
 
     // Encode the password from the seed using the template.
     let mut site_password = ClearOnDrop::new(String::new());
-    for i in 0..template.len() {
-        let c = template.chars().nth(i).unwrap();
+    for (i, c) in template.chars().enumerate() {
         site_password.push(
             character_from_class(c, site_password_seed[i + 1])
         );
     }
 
-    site_password
+    Ok(site_password)
 }
 
 /// Return an array of internal strings that express the template to use for the given type.
@@ -270,6 +320,8 @@ fn templates_for_type(ty: SiteType) -> Vec<&'static str> {
 fn template_for_type(ty: SiteType, seed_byte: u8) -> &'static str {
     let templates = templates_for_type(ty);
     let count = u8::try_from(templates.len()).unwrap();
+    //^ This unwrap is safe, because the templates are hardcoded and much shorter than 256
+    //  characters.
     templates[usize::from(seed_byte % count)]
 }
 
@@ -305,6 +357,8 @@ fn character_from_class(class: char, seed_byte: u8) -> char {
     let class_chars = characters_in_class(class);
     let index = usize::from(seed_byte % u8::try_from(class_chars.len()).unwrap());
     class_chars.chars().nth(index).unwrap()
+    //^ These unwraps are save, because the character classes are hardcoded and shorter than 256
+    //  characters.
 }
 
 /// Encode a fingerprint for a buffer.
@@ -333,6 +387,7 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
 
     let get_part = |set: &[&'static str], seed: u8| {
         set[usize::from(seed % u8::try_from(set.len()).unwrap())]
+        //^ This unwrap is safe, because the sets are short and hardcoded above.
     };
     let mut identicon = String::with_capacity(256);
     identicon.push_str(get_part(&left_arm[..], identicon_seed[0]));
@@ -372,6 +427,7 @@ fn pad(buf: &mut [u8], len: usize) {
     assert!(buf.len() >= PAD_LEN, make_message(PAD_LEN, buf.len()));
     assert!(buf.len() >= len + 1, make_message(len + 1, buf.len()));
     let padding_byte = if len >= PAD_LEN { 0 } else { (PAD_LEN - len).try_into().unwrap() };
+    //^ This unwrap is safe, because `PAD_LEN` is small.
     for b in &mut buf[len..] {
         *b = padding_byte;
     }
@@ -445,7 +501,7 @@ fn test_key_for_user_v3() {
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap();
     let expected_master_key: [u8; 64] = [
         27, 177, 181, 88, 106, 115, 177, 174, 150, 213, 214, 9, 53, 44, 141,
         132, 20, 254, 89, 228, 224, 58, 95, 52, 226, 174, 130, 64, 244, 84, 216,
@@ -463,12 +519,12 @@ fn test_password_for_site_v3() {
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap();
     let site_name = "google.com";
     let password = password_for_site_v3(
         &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
         SiteVariant::Password, &[]
-    );
+    ).unwrap();
     assert_eq!(*password, "QubnJuvaMoke2~");
 }
 
@@ -489,12 +545,12 @@ fn test_unicode_user_name() {
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap();
     let site_name = "de.wikipedia.org";
     let password = password_for_site_v3(
         &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
         SiteVariant::Password, &[]
-    );
+    ).unwrap();
     assert_eq!(*password, "DaknJezb6,Zula");
 }
 
@@ -507,12 +563,12 @@ fn test_unicode_site_name() {
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap();
     let site_name = "山东大学.cn";
     let password = password_for_site_v3(
         &master_key, site_name.as_bytes(), SiteType::GeneratedLong, 1,
         SiteVariant::Password, &[]
-    );
+    ).unwrap();
     assert_eq!(*password, "ZajmGabl0~Zoza");
 }
 

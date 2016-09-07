@@ -17,11 +17,13 @@ use rpassword::read_password;
 use data_encoding::base64;
 
 mod algorithm;
-use algorithm::*;
 mod clear_on_drop;
-use clear_on_drop::ClearOnDrop;
 mod config;
-use config::*;
+
+use algorithm::{SiteVariant, SiteType, master_key_for_user_v3,
+    password_for_site_v3, identicon, min_buffer_len, encrypt, decrypt};
+use clear_on_drop::ClearOnDrop;
+use config::{merge_options, Config, SiteConfig, Site};
 
 static TYPE_HELP: &'static str =
 "The password's template{n}\
@@ -41,6 +43,7 @@ fn flush() {
     std::io::stdout().flush().unwrap_or_exit("could not flush stdout");
 }
 
+/// Read the master password from stdin and generate the master key.
 fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
     print!("Please enter the master password: ");
     flush();
@@ -55,6 +58,7 @@ fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
     master_key
 }
 
+/// Read a site password to be stored from stdin.
 fn get_site_password() -> ClearOnDrop<String> {
     print!("Please enter the site password to be stored: ");
     flush();
@@ -62,17 +66,24 @@ fn get_site_password() -> ClearOnDrop<String> {
     ClearOnDrop::new(password)
 }
 
+/// Exit the program with an error message.
+fn exit(message: &str) -> ! {
+    let err = clap::Error::with_description(message, clap::ErrorKind::InvalidValue);
+    // Ther ErrorKind does not really matter, because we are only interested in exiting and
+    // creating a nice error message in case of failure.
+    err.exit()
+}
+
 trait UnwrapOrExit<T>
     where Self: Sized
 {
+    /// Unwrap the value or execute a closure.
     fn unwrap_or_else<F>(self, f: F) -> T
         where F: FnOnce() -> T;
 
+    /// Unwrap the value or exit the program with an error message.
     fn unwrap_or_exit(self, message: &str) -> T {
-        let err = clap::Error::with_description(message, clap::ErrorKind::InvalidValue);
-        // Ther ErrorKind does not really matter, because we are only interested in exiting and
-        // creating a nice error message in case of failure.
-        self.unwrap_or_else(|| err.exit())
+        self.unwrap_or_else(|| exit(message))
     }
 }
 
@@ -246,8 +257,9 @@ fn main() {
         if let (Some(config_name), Some(param_name)) =
             (config.full_name.as_ref(), param_config.full_name.as_ref())
         {
-            assert_eq!(config_name, param_name,
-                       "full name given as paramater conflicts with config");
+            if config_name != param_name {
+               exit("full name given as paramater conflicts with config");
+            }
         }
         if matches.is_present("store") {
             let full_name = merge_options(
@@ -276,7 +288,7 @@ fn main() {
        matches.is_present("store") {
         // Overwrite config file.
         let s = config.encode();
-        assert!(s != "");
+        debug_assert!(s != "");
         let path = config_path.as_ref().unwrap();
         //^ This unwrap is safe, because clap already did the check.
         let mut f = File::create(path)
@@ -289,7 +301,7 @@ fn main() {
     if matches.is_present("dump") {
         // Output config.
         let s = config.encode();
-        assert!(s != "");
+        debug_assert!(s != "");
         println!("{}", s);
         return;
     }
@@ -308,7 +320,7 @@ fn main() {
 
     // Generate or decrypt passwords.
     for site_config in site_configs {
-        let site = Site::from_config(site_config);
+        let site = Site::from_config(site_config).unwrap_or_else(|e| exit(&e.message));
         // If a site was given, skip all other sites.
         // FIXME: site from parameter should not be printed if already present?
         if let Some(name) = param_site_name {

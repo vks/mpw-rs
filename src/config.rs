@@ -15,6 +15,39 @@ pub fn merge_options<T>(old: Option<T>, new: Option<T>) -> Option<T> {
     }
 }
 
+/// Configuration kind of error.
+#[derive(Debug, Clone, Copy)]
+pub enum ErrorKind {
+    /// Tried to merge configs for different full names.
+    ConflictingFullName,
+    /// Tried to merge configs with conflicting stored passwords.
+    ConflictingStoredPasswords,
+    /// Got a stored password when supposed to generate one.
+    ConflictingStoredGenerated,
+}
+
+/// Master Password algorithm error.
+#[derive(Debug)]
+pub struct Error {
+    // TODO: maybe rather use Cow?
+    pub message: String,
+    pub kind: ErrorKind,
+}
+
+impl From<ErrorKind> for Error {
+    fn from(kind: ErrorKind) -> Error {
+        let message = match kind {
+            ErrorKind::ConflictingFullName
+                => "can only merge configs for the same site",
+            ErrorKind::ConflictingStoredPasswords
+                => "cannot merge two encrypted passwords for the same site",
+            ErrorKind::ConflictingStoredGenerated
+                => "got a stored password for a supposedly generated password",
+        };
+        Error { message: message.into(), kind: kind }
+    }
+}
+
 /// Represent the configuration state that can be stored on disk.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Config<'a> {
@@ -84,16 +117,20 @@ impl<'a> SiteConfig<'a> {
     ///
     /// Values from the other configuration are prefered unless None.
     /// Panics if the configurations are not for the same website.
-    pub fn merge(&mut self, other: SiteConfig<'a>) {
-        assert_eq!(self.name, other.name,
-                   "can only merge configs for the same site");
+    pub fn merge(&mut self, other: SiteConfig<'a>) -> Result<(), Error> {
+        if self.name != other.name {
+            return Err(Error::from(ErrorKind::ConflictingFullName));
+        }
         self.type_ = merge_options(self.type_, other.type_);
         self.counter = merge_options(self.counter, other.counter);
         self.variant = merge_options(self.variant, other.variant);
-        assert!(self.encrypted.is_none() && other.encrypted.is_none());
+        if !(self.encrypted.is_none() && other.encrypted.is_none()) {
+            return Err(Error::from(ErrorKind::ConflictingStoredPasswords));
+        }
         if other.context.is_some() {
             self.context = other.context;
         }
+        Ok(())
     }
 }
 
@@ -110,7 +147,7 @@ pub struct Site<'a> {
 
 impl<'a> Site<'a> {
     /// Create a site from a given config. Missing values are filled with defaults.
-    pub fn from_config(config: &'a SiteConfig<'a>) -> Site<'a> {
+    pub fn from_config(config: &'a SiteConfig<'a>) -> Result<Site<'a>, Error> {
         let variant = config.variant.unwrap_or(SiteVariant::Password);
         let encrypted = match config.encrypted {
             Some(ref s) => Some(s.as_ref().into()),
@@ -128,21 +165,23 @@ impl<'a> Site<'a> {
             }
         );
         if encrypted.is_some() {
-            assert_eq!(type_, SiteType::Stored);
+            if type_ != SiteType::Stored {
+                return Err(Error::from(ErrorKind::ConflictingStoredGenerated));
+            }
         }
         let context = match config.context {
             Some(ref s) => s.as_ref().into(),
             None => "".into(),
         };
 
-        Site {
+        Ok(Site {
             name: config.name.as_ref().into(),
             type_: type_,
             counter: config.counter.unwrap_or(1),
             variant: variant,
             context: context,
             encrypted: encrypted,
-        }
+        })
     }
 }
 

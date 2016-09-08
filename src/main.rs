@@ -17,11 +17,13 @@ use rpassword::read_password;
 use data_encoding::base64;
 
 mod algorithm;
-use algorithm::*;
 mod clear_on_drop;
-use clear_on_drop::ClearOnDrop;
 mod config;
-use config::*;
+
+use algorithm::{SiteVariant, SiteType, master_key_for_user_v3,
+    password_for_site_v3, identicon, min_buffer_len, encrypt, decrypt};
+use clear_on_drop::ClearOnDrop;
+use config::{merge_options, Config, SiteConfig, Site};
 
 static TYPE_HELP: &'static str =
 "The password's template{n}\
@@ -36,25 +38,69 @@ i, pin            4 numbers.{n}\
 n, name           9 letter name.{n}\
 p, phrase         20 character sentence.{n}";
 
+/// Flush to make sure the prompt is visible.
+fn flush() {
+    std::io::stdout().flush().unwrap_or_exit("could not flush stdout");
+}
+
+/// Read the master password from stdin and generate the master key.
 fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
     print!("Please enter the master password: ");
-    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
-    let master_password = read_password().expect("could not read master password");
+    flush();
+    let master_password = read_password().unwrap_or_exit("could not read master password");
 
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
-    );
+    ).unwrap_or_exit("could not generate master key");
     master_key
 }
 
+/// Read a site password to be stored from stdin.
 fn get_site_password() -> ClearOnDrop<String> {
     print!("Please enter the site password to be stored: ");
-    std::io::stdout().flush().unwrap();  // Flush to make sure the prompt is visible.
-    let password = read_password().expect("could not read site password");
+    flush();
+    let password = read_password().unwrap_or_exit("could not read site password");
     ClearOnDrop::new(password)
+}
+
+/// Exit the program with an error message.
+fn exit(message: &str) -> ! {
+    let err = clap::Error::with_description(message, clap::ErrorKind::InvalidValue);
+    // Ther ErrorKind does not really matter, because we are only interested in exiting and
+    // creating a nice error message in case of failure.
+    err.exit()
+}
+
+trait UnwrapOrExit<T>
+    where Self: Sized
+{
+    /// Unwrap the value or execute a closure.
+    fn unwrap_or_else<F>(self, f: F) -> T
+        where F: FnOnce() -> T;
+
+    /// Unwrap the value or exit the program with an error message.
+    fn unwrap_or_exit(self, message: &str) -> T {
+        self.unwrap_or_else(|| exit(message))
+    }
+}
+
+impl<T> UnwrapOrExit<T> for Option<T> {
+    fn unwrap_or_else<F>(self, f: F) -> T
+        where F: FnOnce() -> T
+    {
+        self.unwrap_or_else(f)
+    }
+}
+
+impl<T, E> UnwrapOrExit<T> for Result<T, E> {
+    fn unwrap_or_else<F>(self, f: F) -> T
+        where F: FnOnce() -> T
+    {
+        self.unwrap_or_else(|_| f())
+    }
 }
 
 fn main() {
@@ -163,11 +209,11 @@ fn main() {
     let mut config_string = String::new();
     let mut config = if let Some(path) = config_path {
         let mut f = File::open(path)
-            .expect("could not open given config file");
+            .unwrap_or_exit("could not open given config file");
         f.read_to_string(&mut config_string)
-            .expect("could not read given config file");
+            .unwrap_or_exit("could not read given config file");
         Config::from_str(&config_string)
-            .expect("could not parse given config file")
+            .unwrap_or_exit("could not parse given config file")
     } else {
         Config::new()
     };
@@ -180,9 +226,11 @@ fn main() {
         let param_site_config = SiteConfig {
             name: name.into(),
             type_: matches.value_of("type").map(|s| SiteType::from_str(s).unwrap()),
+            //^ This unwrap is safe, because clap already did the check.
             counter: matches.value_of("counter")
-            .map(|c| c.parse().expect("counter must be an unsigned 32-bit integer")),
+            .map(|c| c.parse().unwrap_or_exit("counter must be an unsigned 32-bit integer")),
             variant: matches.value_of("variant").map(|s| SiteVariant::from_str(s).unwrap()),
+            //^ This unwrap is safe, because clap already did the check.
             context: matches.value_of("context").map(Into::into),
             encrypted: None,
         };
@@ -193,6 +241,7 @@ fn main() {
         // Remove all sites that have the given name, unless they stored a
         // password.
         let param_site_name = param_site_name.unwrap();
+        //^ This unwrap is safe, because clap already did the check.
         if let Some(ref mut sites) = config.sites {
             sites.retain(|ref s|
                 s.name != param_site_name || s.encrypted.is_some());
@@ -208,20 +257,22 @@ fn main() {
         if let (Some(config_name), Some(param_name)) =
             (config.full_name.as_ref(), param_config.full_name.as_ref())
         {
-            assert_eq!(config_name, param_name,
-                       "full name given as paramater conflicts with config");
+            if config_name != param_name {
+               exit("full name given as paramater conflicts with config");
+            }
         }
         if matches.is_present("store") {
             let full_name = merge_options(
                 config.full_name.as_ref(),
                 param_config.full_name.as_ref(),
-            ).expect("need full name to generate master key");
+            ).unwrap_or_exit("need full name to generate master key");
             let key = generate_master_key(full_name);
 
             let password = get_site_password();
             let mut buffer = vec![0; min_buffer_len(password.len())];
             encrypt(password.as_ref(), &key, &mut buffer);
             let ref mut site = param_config.sites.as_mut().unwrap()[0];
+            //^ This unwrap is safe, because we now it was set to Some before.
             site.encrypted = Some(
                 base64::encode(&buffer).into()
             );
@@ -237,25 +288,29 @@ fn main() {
        matches.is_present("store") {
         // Overwrite config file.
         let s = config.encode();
-        assert!(s != "");
-        let path = config_path.as_ref().unwrap();  // Clap checked it is present.
+        debug_assert!(s != "");
+        let path = config_path.as_ref().unwrap();
+        //^ This unwrap is safe, because clap already did the check.
         let mut f = File::create(path)
-            .expect("could not overwrite given config file");
+            .unwrap_or_exit("could not overwrite given config file");
         f.write_all(s.as_bytes())
-            .expect("could not write to given config file");
+            .unwrap_or_exit("could not write to given config file");
         return;
     }
 
     if matches.is_present("dump") {
         // Output config.
         let s = config.encode();
-        assert!(s != "");
+        debug_assert!(s != "");
         println!("{}", s);
         return;
     }
 
     let full_name = config.full_name.as_ref()
-        .expect("need full name to generate master key");
+        .unwrap_or_exit("need full name to generate master key");
+
+    let site_configs = config.sites.as_ref()
+        .unwrap_or_exit("need a site via command line parameters or via config");
 
     let master_key = if let Some(key) = master_key {
         key
@@ -264,8 +319,8 @@ fn main() {
     };
 
     // Generate or decrypt passwords.
-    for site_config in config.sites.as_ref().unwrap().iter() {
-        let site = Site::from_config(site_config);
+    for site_config in site_configs {
+        let site = Site::from_config(site_config).unwrap_or_else(|e| exit(&e.message));
         // If a site was given, skip all other sites.
         // FIXME: site from parameter should not be printed if already present?
         if let Some(name) = param_site_name {
@@ -280,14 +335,14 @@ fn main() {
         let password = match site.type_ {
             SiteType::Stored => {
                 let encrypted = site.encrypted.as_ref()
-                    .expect("found stored password without 'encrypted' field")
+                    .unwrap_or_exit("found stored password without 'encrypted' field")
                     .as_bytes();
                 let decoded = &base64::decode(encrypted)
-                    .expect("could not decode 'encrypted' field");
+                    .unwrap_or_exit("could not decode 'encrypted' field");
                 buffer.resize(decoded.len(), 0);
                 buffer.clone_from_slice(decoded);
                 let decrypted = decrypt(&master_key, &mut buffer);
-                std::str::from_utf8(decrypted).expect("could not decrypt stored password")
+                std::str::from_utf8(decrypted).unwrap_or_exit("could not decrypt stored password")
             },
             _ => {
                 password_string = password_for_site_v3(
@@ -297,7 +352,7 @@ fn main() {
                     site.counter,
                     site.variant,
                     site.context.as_bytes()
-                );
+                ).unwrap_or_exit("could not generate site password");
                 &password_string
             },
         };

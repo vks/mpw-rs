@@ -20,6 +20,7 @@ use self::byteorder::{BigEndian, WriteBytesExt};
 use clear_on_drop::ClearOnDrop;
 
 lazy_static! {
+    /// Scrypt parameters used by the Master Password algorithm.
     static ref SCRYPT_PARAMS: ScryptParams = ScryptParams::new(15, 8, 2);
 }
 

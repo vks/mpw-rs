@@ -1,10 +1,68 @@
 extern crate libc;
+extern crate errno;
 
 use std::convert::AsMut;
 use std::ops::{Deref, DerefMut};
 use std::intrinsics;
 
-use self::libc::{c_void, mlock, munlock};
+use self::libc::c_void;
+use self::errno::{errno, Errno};
+
+#[derive(Debug, Display, Clone, Copy)]
+enum Error {
+    /// Some of the specified address range does not correspond to mapped pages
+    /// in the address space of the process.
+    NoMemory,
+    /// The caller is not priveleged, but needs privilege to perform the
+    /// requested operation.
+    Permission,
+    /// Some or all of the specified address range could not be locked.
+    Again,
+    /// Address was not a multiple of the page size (not on Linux).
+    Invalid,
+    /// Other, unexpected error.
+    Other(Errno),
+}
+
+impl From<Errno> for Error {
+    fn from(errno: Errno) -> Error {
+        let Errno(error_code) = errno;
+        match error_code {
+            libc::ENOMEM => Error::NoMemory,
+            libc::EPERM => Error::Permission,
+            libc::EAGAIN => Error::Again,
+            libc::EINVAL => Error::Invalid,
+            _ => Error::Other(errno),
+        }
+    }
+}
+
+/// Lock part of the calling process's virtual memory into RAM.
+///
+/// This prevents that memory from being paged to the swap area.
+fn mlock(slice: &[u8]) -> Result<(), Error> {
+    let return_code = unsafe {
+        libc::mlock(slice.as_ptr() as *const c_void, slice.len())
+    };
+    if return_code == 0 {
+        return Ok(());
+    }
+    Err(errno().into())
+}
+
+/// Unlock pages in the given address range.
+///
+/// After this call, all pages that contain a part of the specified memory
+/// range can be moved to external swap space again by the kernel.
+fn munlock(slice: &[u8]) -> Result<(), Error> {
+    let return_code = unsafe {
+        libc::munlock(slice.as_ptr() as *const c_void, slice.len())
+    };
+    if return_code == 0 {
+        return Ok(());
+    }
+    Err(errno().into())
+}
 
 /// A cheap, mutable reference-to-mutable reference conversion.
 ///
@@ -57,8 +115,7 @@ impl<T: UnsafeAsMut> ClearOnDrop<T> {
         let mut result = ClearOnDrop { container: container };
         unsafe {
             let slice = result.container.as_mut();
-            let return_code = mlock(slice.as_ptr() as *const c_void, slice.len());
-            //debug_assert_eq!(return_code, 0, "could not lock memory in ClearOnDrop::new");
+            let _ = mlock(slice);  // This sometimes fails for some reason.
         }
         result
     }
@@ -85,8 +142,7 @@ impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
         unsafe {
             let slice = self.container.as_mut();
             intrinsics::volatile_set_memory(slice.as_ptr() as *mut c_void, 0, slice.len());
-            let return_code = munlock(slice.as_ptr() as *const c_void, slice.len());
-            //debug_assert_eq!(return_code, 0, "could not unlock memory in ClearOnDrop::drop");
+            let _ = munlock(slice);  // This sometimes fails for some reason.
         }
     }
 }
@@ -108,4 +164,3 @@ fn test_clear_on_drop_array() {
     let a = [1; 64];
     let _ = ClearOnDrop::new(a);
 }
-

@@ -4,7 +4,7 @@ use std::convert::AsMut;
 use std::ops::{Deref, DerefMut};
 use std::intrinsics;
 
-use self::libc::c_void;
+use self::libc::{c_void, mlock, munlock};
 
 /// A cheap, mutable reference-to-mutable reference conversion.
 ///
@@ -45,7 +45,6 @@ impl UnsafeAsMut for String {
 /// A container representing a byte slice that is set to zero on drop.
 ///
 /// Useful to make sure that secret data is cleared from memory after use.
-// TODO: Make sure the string is not swapped by using mman::mlock.
 // TODO: Investigate mprotect.
 #[derive(Debug)]
 pub struct ClearOnDrop<T: UnsafeAsMut> {
@@ -54,7 +53,14 @@ pub struct ClearOnDrop<T: UnsafeAsMut> {
 
 impl<T: UnsafeAsMut> ClearOnDrop<T> {
     pub fn new(container: T) -> ClearOnDrop<T> {
-        ClearOnDrop { container: container }
+        // Make sure the string is not swapped by using mlock.
+        let mut result = ClearOnDrop { container: container };
+        unsafe {
+            let slice = result.container.as_mut();
+            let return_code = mlock(slice.as_ptr() as *const c_void, slice.len());
+            //debug_assert_eq!(return_code, 0, "could not lock memory in ClearOnDrop::new");
+        }
+        result
     }
 }
 
@@ -79,6 +85,8 @@ impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
         unsafe {
             let slice = self.container.as_mut();
             intrinsics::volatile_set_memory(slice.as_ptr() as *mut c_void, 0, slice.len());
+            let return_code = munlock(slice.as_ptr() as *const c_void, slice.len());
+            //debug_assert_eq!(return_code, 0, "could not unlock memory in ClearOnDrop::drop");
         }
     }
 }

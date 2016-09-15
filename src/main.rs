@@ -256,38 +256,34 @@ fn main() {
     }
 
     let mut master_key = None;
-    if matches.is_present("add") ||
-       matches.is_present("replace") ||
-       matches.is_present("store") ||
-       !matches.is_present("config") {
-        // Merge parameters into config.
-        if let (Some(config_name), Some(param_name)) =
-            (config.full_name.as_ref(), param_config.full_name.as_ref())
-        {
-            if config_name != param_name {
-               exit("full name given as paramater conflicts with config");
-            }
-        }
-        if matches.is_present("store") {
-            let full_name = merge_options(
-                config.full_name.as_ref(),
-                param_config.full_name.as_ref(),
-            ).unwrap_or_exit("need full name to generate master key");
-            let key = generate_master_key(full_name);
 
-            let password = get_site_password();
-            let mut buffer = vec![0; min_buffer_len(password.len())];
-            encrypt(password.as_ref(), &key, &mut buffer);
-            let ref mut site = param_config.sites.as_mut().unwrap()[0];
-            //^ This unwrap is safe, because we now it was set to Some before.
-            site.encrypted = Some(
-                base64::encode(&buffer).into()
-            );
-            site.type_ = Some(SiteType::Stored);
-            master_key = Some(key);
+    // Merge parameters into config.
+    if let (Some(config_name), Some(param_name)) =
+        (config.full_name.as_ref(), param_config.full_name.as_ref())
+    {
+        if config_name != param_name {
+           exit("full name given as paramater conflicts with config");
         }
-        config.merge(param_config);
     }
+    if matches.is_present("store") {
+        let full_name = merge_options(
+            config.full_name.as_ref(),
+            param_config.full_name.as_ref(),
+        ).unwrap_or_exit("need full name to generate master key");
+        let key = generate_master_key(full_name);
+
+        let password = get_site_password();
+        let mut buffer = vec![0; min_buffer_len(password.len())];
+        encrypt(password.as_ref(), &key, &mut buffer);
+        let ref mut site = param_config.sites.as_mut().unwrap()[0];
+        //^ This unwrap is safe, because we now it was set to Some before.
+        site.encrypted = Some(
+            base64::encode(&buffer).into()
+        );
+        site.type_ = Some(SiteType::Stored);
+        master_key = Some(key);
+    }
+    config.merge(param_config);
 
     if matches.is_present("add") ||
        matches.is_present("replace") ||

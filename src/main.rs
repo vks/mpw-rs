@@ -201,7 +201,6 @@ fn main() {
              .help("Encrypt and store a password")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "delete", "replace"]))
-        .set_term_width(0)
         .get_matches();
 
     // If given, read config from path.

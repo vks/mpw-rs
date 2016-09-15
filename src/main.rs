@@ -172,7 +172,7 @@ fn main() {
         .arg(Arg::with_name("config")
              .long("config")
              .short("i")
-             .help("Read configuration from a TOML file.")
+             .help("Read/write configuration from/to a TOML file.")
              .takes_value(true)
              .number_of_values(1))
         .arg(Arg::with_name("add")
@@ -207,12 +207,20 @@ fn main() {
     let config_path = matches.value_of("config");
     let mut config_string = String::new();
     let mut config = if let Some(path) = config_path {
-        let mut f = File::open(path)
-            .unwrap_or_exit("could not open given config file");
-        f.read_to_string(&mut config_string)
-            .unwrap_or_exit("could not read given config file");
-        Config::from_str(&config_string)
-            .unwrap_or_exit("could not parse given config file")
+        let file = File::open(path);
+        match file {
+            Ok(mut f) => {
+                f.read_to_string(&mut config_string)
+                    .unwrap_or_exit("could not read given config file");
+                Config::from_str(&config_string)
+                    .unwrap_or_exit("could not parse given config file")
+            },
+            Err(_) => {
+                // If the config file is not present, assume an empty config.
+                // TODO: make sure we get an error if the config is the only argument
+                Config::new()
+            }
+        }
     } else {
         Config::new()
     };

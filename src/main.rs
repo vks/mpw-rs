@@ -26,17 +26,17 @@ use clear_on_drop::ClearOnDrop;
 use config::{merge_options, Config, SiteConfig, Site};
 
 static TYPE_HELP: &'static str =
-"The password's template{n}\
-(defaults to 'long' for password, 'name' for login, 'phrase' for answer){n}\
-{n}\
-x, max, maximum   20 characters, contains symbols.{n}\
-l, long           Copy-friendly, 14 characters, contains symbols.{n}\
-m, med, medium    Copy-friendly, 8 characters, contains symbols.{n}\
-b, basic          8 characters, no symbols.{n}\
-s, short          Copy-friendly, 4 characters, no symbols.{n}\
-i, pin            4 numbers.{n}\
-n, name           9 letter name.{n}\
-p, phrase         20 character sentence.{n}";
+"The password's template\n\
+(defaults to 'long' for password, 'name' for login, 'phrase' for answer)\n\
+\n\
+x, max, maximum   20 characters, contains symbols.\n\
+l, long           Copy-friendly, 14 characters, contains symbols.\n\
+m, med, medium    Copy-friendly, 8 characters, contains symbols.\n\
+b, basic          8 characters, no symbols.\n\
+s, short          Copy-friendly, 4 characters, no symbols.\n\
+i, pin            4 numbers.\n\
+n, name           9 letter name.\n\
+p, phrase         20 character sentence.\n";
 
 /// Flush to make sure the prompt is visible.
 fn flush() {
@@ -116,7 +116,7 @@ fn main() {
         .arg(Arg::with_name("full name")
              .long("name")
              .short("u")
-             .help("The full name of the user.{n}Optional if given in config.")
+             .help("The full name of the user.\nOptional if given in config.")
              .required_unless("config")
              .number_of_values(1)
              .takes_value(true))
@@ -146,10 +146,10 @@ fn main() {
         .arg(Arg::with_name("variant")
              .long("variant")
              .short("v")
-             .help("The kind of content to generate (defaults to 'password'){n}\
-                    {n}\
-                    p, password  Generate a password{n}\
-                    l, login     Generate a login name{n}\
+             .help("The kind of content to generate (defaults to 'password')\n\
+                    \n\
+                    p, password  Generate a password\n\
+                    l, login     Generate a login name\n\
                     a, answer    Generate an answer to a question")
              .next_line_help(true)
              .takes_value(true)
@@ -184,14 +184,14 @@ fn main() {
         .arg(Arg::with_name("replace")
              .long("replace")
              .short("r")
-             .help("Replace parameters of all site passwords in configuration file.{n}\
+             .help("Replace parameters of all site passwords in configuration file.\n\
                     Does not delete stored passwords.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "delete", "store"]))
         .arg(Arg::with_name("delete")
              .long("delete")
              .short("D")
-             .help("Delete parameters of all site passwords in configuration file.{n}\
+             .help("Delete parameters of all site passwords in configuration file.\n\
                     Does not delete stored passwords.")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "replace", "store"]))

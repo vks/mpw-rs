@@ -164,10 +164,8 @@ impl<'a> Site<'a> {
                 SiteType::Stored
             }
         );
-        if encrypted.is_some() {
-            if type_ != SiteType::Stored {
-                return Err(Error::from(ErrorKind::ConflictingStoredGenerated));
-            }
+        if encrypted.is_some() && type_ != SiteType::Stored {
+            return Err(Error::from(ErrorKind::ConflictingStoredGenerated));
         }
         let context = match config.context {
             Some(ref s) => s.as_ref().into(),

@@ -381,7 +381,7 @@ pub fn identicon(full_name: &[u8], master_password: &[u8]) -> String {
     ];
 
     let signing_key = hmac::SigningKey::new(&digest::SHA256, master_password);
-    let digest = hmac::sign(&signing_key, &full_name);
+    let digest = hmac::sign(&signing_key, full_name);
     let identicon_seed = digest.as_ref();
 
     // TODO color

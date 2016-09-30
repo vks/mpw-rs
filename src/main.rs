@@ -250,7 +250,7 @@ fn main() {
         let param_site_name = param_site_name.unwrap();
         //^ This unwrap is safe, because clap already did the check.
         if let Some(ref mut sites) = config.sites {
-            sites.retain(|ref s|
+            sites.retain(|s|
                 s.name != param_site_name || s.encrypted.is_some());
         }
     }
@@ -275,7 +275,7 @@ fn main() {
         let password = get_site_password();
         let mut buffer = vec![0; min_buffer_len(password.len())];
         encrypt(password.as_ref(), &key, &mut buffer);
-        let ref mut site = param_config.sites.as_mut().unwrap()[0];
+        let site = &mut param_config.sites.as_mut().unwrap()[0];
         //^ This unwrap is safe, because we now it was set to Some before.
         site.encrypted = Some(
             base64::encode(&buffer).into()

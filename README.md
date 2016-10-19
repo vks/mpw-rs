@@ -78,7 +78,7 @@ The keywords in the config are the same as the for long command line parameters.
 
 * Passwords are never stored
     * No brute force attacks against stored passwords possible
-    * No synchronization over devices required
+    * No synchronization of devices required
 
 ### Disadvantages
 

@@ -1,5 +1,4 @@
-#![feature(try_from, custom_derive, plugin, question_mark, core_intrinsics)]
-#![plugin(serde_macros)]
+#![feature(try_from, proc_macro, custom_derive, plugin, question_mark, core_intrinsics)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -7,6 +6,8 @@ extern crate lazy_static;
 extern crate clap;
 extern crate rpassword;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate data_encoding;
 
 use std::io::{Read, Write};

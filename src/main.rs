@@ -1,4 +1,4 @@
-#![feature(try_from, proc_macro, custom_derive, plugin, question_mark, core_intrinsics)]
+#![feature(try_from, proc_macro, custom_derive, core_intrinsics)]
 
 #[macro_use]
 extern crate lazy_static;

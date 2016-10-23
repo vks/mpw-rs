@@ -7,7 +7,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
-# mpw
+# mpw [![Build Status](https://travis-ci.org/vks/mpw-rs.svg?branch=master)](https://travis-ci.org/vks/mpw-rs)
 
 A stateless password management solution.
 

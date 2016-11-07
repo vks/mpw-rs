@@ -82,9 +82,16 @@ The keywords in the config are the same as the for long command line parameters.
 
 ### Disadvantages
 
+* If one password is compromised, your master password can be brute forced
+  (this is mitigated by a strong key-derivation function)
 * Changing the master password requires changing all passwords
+* Changing the algorithm requires changing all passwords
+  (unless you introduce some non-secret state you have to store or remember)
+* Changing a site password introduces a counter
+  (some non-secret state you have to store or remember)
 * Losing your master password compromises all passwords
   (for traditional managers you would have to lose your master password *and*
   the stored passwords)
 * You can't use custom passwords
 * You can't use custom password generation templates
+

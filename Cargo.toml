@@ -16,7 +16,7 @@ ring = "0.5"
 ring-pwhash = "0.1"
 data-encoding = "1"
 libc = "0.2"
-errno = "0.1"
+errno = "0.2"
 
 [dependencies.toml]
 version = "0.2"

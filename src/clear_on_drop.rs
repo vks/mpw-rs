@@ -8,7 +8,7 @@ use std::intrinsics;
 use self::libc::c_void;
 use self::errno::{errno, Errno};
 
-#[derive(Debug, Display, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Error {
     /// Some of the specified address range does not correspond to mapped pages
     /// in the address space of the process.

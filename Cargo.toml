@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 lazy_static = "0.2"
-byteorder = "0.5"
+byteorder = "1"
 rpassword = "0.3"
 serde = "0.8"
 serde_derive = "0.8"

@@ -9,11 +9,11 @@ repository = "https://github.com/vks/mpw-rs"
 
 [dependencies]
 lazy_static = "0.2"
-byteorder = "0.5"
+byteorder = "1"
 rpassword = "0.3"
 serde = "0.8"
 serde_derive = "0.8"
-ring = "0.5"
+ring = "0.6"
 ring-pwhash = "0.1"
 data-encoding = "1"
 libc = "0.2"

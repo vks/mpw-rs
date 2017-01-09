@@ -13,7 +13,7 @@ enum Error {
     /// Some of the specified address range does not correspond to mapped pages
     /// in the address space of the process.
     NoMemory,
-    /// The caller is not priveleged, but needs privilege to perform the
+    /// The caller is not privileged, but needs privilege to perform the
     /// requested operation.
     Permission,
     /// Some or all of the specified address range could not be locked.

@@ -5,6 +5,7 @@ authors = ["Vinzent Steinberg <Vinzent.Steinberg@gmail.com>"]
 description = "A stateless password management solution."
 readme = "README.md"
 license = "MIT"
+repository = "https://github.com/vks/mpw-rs"
 
 [dependencies]
 lazy_static = "0.2"

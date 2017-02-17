@@ -1,4 +1,4 @@
-#![feature(try_from, proc_macro, custom_derive, core_intrinsics)]
+#![feature(try_from, core_intrinsics)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -291,7 +291,8 @@ fn main() {
        matches.is_present("delete") ||
        matches.is_present("store") {
         // Overwrite config file.
-        let s = config.encode();
+        let s = config.encode()
+            .unwrap_or_exit("could not encode config");
         debug_assert!(s != "");
         let path = config_path.as_ref().unwrap();
         //^ This unwrap is safe, because clap already did the check.
@@ -304,7 +305,8 @@ fn main() {
 
     if matches.is_present("dump") {
         // Output config.
-        let s = config.encode();
+        let s = config.encode()
+            .unwrap_or_exit("could not encode config");
         debug_assert!(s != "");
         println!("{}", s);
         return;

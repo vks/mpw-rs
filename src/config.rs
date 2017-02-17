@@ -62,13 +62,13 @@ impl<'a> Config<'a> {
     }
 
     /// Try to create a configuration given a TOML string.
-    pub fn from_str(s: &'a str) -> Option<Config<'a>> {
-        toml::decode_str(s)
+    pub fn from_str(s: &'a str) -> Result<Config<'a>, toml::de::Error> {
+        toml::from_str(s)
     }
 
     /// Encode the config as a TOML string.
-    pub fn encode(&self) -> String {
-        toml::encode_str(self)
+    pub fn encode(&self) -> Result<String, toml::ser::Error> {
+        toml::to_string(self)
     }
 
     /// Merge another configuration into this one.
@@ -202,13 +202,13 @@ fn test_config_merge() {
 #[test]
 fn test_config_encode() {
     let mut c = Config::new();
-    assert_eq!(c.encode(), "");
+    assert_eq!(c.encode().unwrap(), "");
     c.full_name = Some("John Doe".into());
-    assert_eq!(c.encode(), "full_name = \"John Doe\"\n");
+    assert_eq!(c.encode().unwrap(), "full_name = \"John Doe\"\n");
 
     let wikipedia = SiteConfig::new("wikipedia.org");
     c.sites = Some(vec![wikipedia]);
-    assert_eq!(c.encode(),
+    assert_eq!(c.encode().unwrap(),
 r#"full_name = "John Doe"
 
 [[sites]]
@@ -222,15 +222,15 @@ name = "wikipedia.org"
     github.context = Some("".into());
     let bitbucket = SiteConfig::new("bitbucket.org");
     c.sites = Some(vec![github, bitbucket]);
-    assert_eq!(c.encode(),
+    assert_eq!(c.encode().unwrap(),
 r#"full_name = "John Doe"
 
 [[sites]]
-context = ""
-counter = 1
 name = "github.com"
 type = "maximum"
+counter = 1
 variant = "password"
+context = ""
 
 [[sites]]
 name = "bitbucket.org"
@@ -241,7 +241,7 @@ name = "bitbucket.org"
 fn test_variant_encode() {
     #[derive(Debug, Serialize)]
     struct V { variant: SiteVariant }
-    assert_eq!(toml::encode_str(&V { variant: SiteVariant::Password }),
+    assert_eq!(toml::to_string(&V { variant: SiteVariant::Password }).unwrap(),
                "variant = \"password\"\n");
 }
 
@@ -249,7 +249,7 @@ fn test_variant_encode() {
 fn test_type_encode() {
     #[derive(Debug, Serialize)]
     struct T { type_: SiteType }
-    assert_eq!(toml::encode_str(&T { type_: SiteType::GeneratedLong }),
+    assert_eq!(toml::to_string(&T { type_: SiteType::GeneratedLong }).unwrap(),
                "type_ = \"long\"\n");
 }
 

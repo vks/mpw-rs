@@ -6,11 +6,12 @@ extern crate ring_pwhash;
 extern crate data_encoding;
 extern crate byteorder;
 
-use std::io;
-use std::error::Error as StdError;
-use std::io::Write;
 use std::convert::{TryInto, TryFrom};
 use std::cmp::max;
+use std::io;
+use std::io::Write;
+use std::error::Error as StdError;
+use std::fmt;
 
 use self::ring::{aead, digest, hmac, rand};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
@@ -53,7 +54,7 @@ impl SiteVariant {
 }
 
 impl ::serde::Serialize for SiteVariant {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: ::serde::Serializer
     {
         serializer.serialize_str(match *self {
@@ -65,7 +66,7 @@ impl ::serde::Serialize for SiteVariant {
 }
 
 impl ::serde::Deserialize for SiteVariant {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: ::serde::Deserializer
     {
         struct Visitor;
@@ -73,12 +74,15 @@ impl ::serde::Deserialize for SiteVariant {
         impl ::serde::de::Visitor for Visitor {
             type Value = SiteVariant;
 
-            fn visit_str<E>(&mut self, value: &str) -> Result<SiteVariant, E>
-                where E: ::serde::Error
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, r#"one of the following strings: "p", "password", "l", "login", "a", "answer""#)
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<SiteVariant, E>
+                where E: ::serde::de::Error
             {
                 SiteVariant::from_str(value)
-                    .ok_or_else(|| E::invalid_value(
-                                   &format!("unknown SiteVariant variant: {}", value)))
+                    .ok_or_else(|| E::invalid_value(::serde::de::Unexpected::Str(value), &self))
             }
         }
 
@@ -130,7 +134,7 @@ impl SiteType {
 }
 
 impl ::serde::Serialize for SiteType {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: ::serde::Serializer
     {
         serializer.serialize_str(match *self {
@@ -148,7 +152,7 @@ impl ::serde::Serialize for SiteType {
 }
 
 impl ::serde::Deserialize for SiteType {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: ::serde::Deserializer
     {
         struct Visitor;
@@ -156,12 +160,15 @@ impl ::serde::Deserialize for SiteType {
         impl ::serde::de::Visitor for Visitor {
             type Value = SiteType;
 
-            fn visit_str<E>(&mut self, value: &str) -> Result<SiteType, E>
-                where E: ::serde::Error
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, r#"one of the following strings: "x", "max", "maximum", "l", "long", "m", "med", "medium", "b", "basic", "s", "short", "i", "pin", "n", "name", "p", "phrase", "stored""#)
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<SiteType, E>
+                where E: ::serde::de::Error
             {
                 SiteType::from_str(value)
-                    .ok_or_else(|| E::invalid_value(
-                                   &format!("unknown SiteType variant: {}", value)))
+                    .ok_or_else(|| E::invalid_value(::serde::de::Unexpected::Str(value), &self))
             }
         }
 

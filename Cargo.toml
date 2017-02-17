@@ -11,8 +11,8 @@ repository = "https://github.com/vks/mpw-rs"
 lazy_static = "0.2"
 byteorder = "1"
 rpassword = "0.3"
-serde = "0.8"
-serde_derive = "0.8"
+serde = "0.9"
+serde_derive = "0.9"
 ring = "0.6"
 ring-pwhash = "0.1"
 data-encoding = "1"
@@ -20,7 +20,7 @@ libc = "0.2"
 errno = "0.2"
 
 [dependencies.toml]
-version = "0.2"
+version = "0.3"
 default-features = false
 features = ["serde"]
 

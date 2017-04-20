@@ -106,15 +106,15 @@ impl UnsafeAsMut for String {
 // TODO: Investigate mprotect.
 #[derive(Debug)]
 pub struct ClearOnDrop<T: UnsafeAsMut> {
-    container: T
+    container: Box<T>
 }
 
 impl<T: UnsafeAsMut> ClearOnDrop<T> {
     pub fn new(container: T) -> ClearOnDrop<T> {
         // Make sure the string is not swapped by using mlock.
-        let mut result = ClearOnDrop { container: container };
+        let mut result = ClearOnDrop { container: Box::new(container) };
         unsafe {
-            let slice = result.container.as_mut();
+            let slice = result.container.deref_mut().as_mut();
             let _ = mlock(slice);  // This sometimes fails for some reason.
         }
         result
@@ -136,11 +136,12 @@ impl<T: UnsafeAsMut> DerefMut for ClearOnDrop<T> {
 }
 
 impl<T: UnsafeAsMut> Drop for ClearOnDrop<T> {
+    #[inline(never)]
     fn drop(&mut self) {
         // We use a volatile memset that makes sure it is not optimized away. It
         // is safe to overwrite strings with zeros, because it is valid UTF-8.
         unsafe {
-            let slice = self.container.as_mut();
+            let slice = self.container.deref_mut().as_mut();
             intrinsics::volatile_set_memory(slice.as_ptr() as *mut c_void, 0, slice.len());
             let _ = munlock(slice);  // This sometimes fails for some reason.
         }

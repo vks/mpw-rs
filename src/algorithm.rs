@@ -65,13 +65,13 @@ impl ::serde::Serialize for SiteVariant {
     }
 }
 
-impl ::serde::Deserialize for SiteVariant {
+impl<'de> ::serde::Deserialize<'de> for SiteVariant {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: ::serde::Deserializer
+        where D: ::serde::Deserializer<'de>
     {
         struct Visitor;
 
-        impl ::serde::de::Visitor for Visitor {
+        impl<'de> ::serde::de::Visitor<'de> for Visitor {
             type Value = SiteVariant;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -151,13 +151,13 @@ impl ::serde::Serialize for SiteType {
     }
 }
 
-impl ::serde::Deserialize for SiteType {
+impl<'de> ::serde::Deserialize<'de> for SiteType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: ::serde::Deserializer
+        where D: ::serde::Deserializer<'de>
     {
         struct Visitor;
 
-        impl ::serde::de::Visitor for Visitor {
+        impl<'de> ::serde::de::Visitor<'de> for Visitor {
             type Value = SiteType;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -420,7 +420,7 @@ fn padded_len(clear_text_len: usize) -> usize {
 
 /// Calculate the minimal length of the encryption buffer.
 pub fn min_buffer_len(clear_text_len: usize) -> usize {
-    padded_len(clear_text_len) + NONCE_LEN + aead::MAX_OVERHEAD_LEN
+    padded_len(clear_text_len) + NONCE_LEN + aead::MAX_TAG_LEN
 }
 
 /// Pad the password of length `len` to a minimal length `PAD_LEN`.
@@ -483,7 +483,7 @@ pub fn encrypt(clear_text: &[u8], master_key: &[u8; 64], buffer: &mut [u8]) {
     let key = aead::SealingKey::new(&aead::CHACHA20_POLY1305, &master_key[0..32])
         .expect("invalid CHACHA20_POLY1305 key");
     let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
-    aead::seal_in_place(&key, nonce, in_out, aead::MAX_OVERHEAD_LEN, &[])
+    aead::seal_in_place(&key, nonce, &[], in_out, aead::MAX_TAG_LEN)
         .expect("failed to encrypt password");
 }
 
@@ -496,9 +496,8 @@ pub fn decrypt<'a>(master_key: &[u8; 64], buffer: &'a mut [u8]) -> &'a [u8] {
         .expect("invalid CHACHA20_POLY1305 key");
     assert!(buffer.len() > NONCE_LEN, "invalid cipher text");
     let (nonce, mut in_out) = buffer.split_at_mut(NONCE_LEN);
-    let len = aead::open_in_place(&key, nonce, 0, in_out, &[])
+    let padded = aead::open_in_place(&key, nonce, &[], 0, in_out)
         .expect("failed to decrypt password");
-    let padded = &in_out[0..len];
     unpad(padded)
 }
 

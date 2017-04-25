@@ -51,6 +51,7 @@ impl From<ErrorKind> for Error {
 /// Represent the configuration state that can be stored on disk.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Config<'a> {
+    #[serde(borrow)]
     pub full_name: Option<Cow<'a, str>>,
     pub sites: Option<Vec<SiteConfig<'a>>>,
 }
@@ -91,12 +92,15 @@ impl<'a> Config<'a> {
 /// The configuration that can be stored about a site.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SiteConfig<'a> {
+    #[serde(borrow)]
     pub name: Cow<'a, str>,
     #[serde(rename = "type")]
     pub type_: Option<SiteType>,
     pub counter: Option<u32>,
     pub variant: Option<SiteVariant>,
+    #[serde(borrow)]
     pub context: Option<Cow<'a, str>>,
+    #[serde(borrow)]
     pub encrypted: Option<Cow<'a, str>>,
 }
 

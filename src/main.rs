@@ -4,6 +4,7 @@
 extern crate lazy_static;
 #[macro_use]
 extern crate clap;
+extern crate ring;
 extern crate rpassword;
 extern crate serde;
 #[macro_use]
@@ -14,6 +15,7 @@ use std::io::{Read, Write};
 use std::fs::File;
 
 use clap::{Arg, App, AppSettings};
+use ring::rand::SystemRandom;
 use rpassword::read_password;
 use data_encoding::base64;
 
@@ -21,8 +23,9 @@ mod algorithm;
 mod clear_on_drop;
 mod config;
 
-use algorithm::{SiteVariant, SiteType, master_key_for_user_v3,
-    password_for_site_v3, identicon, min_buffer_len, encrypt, decrypt};
+use algorithm::{SiteVariant, SiteType, random_password_for_site,
+    master_key_for_user_v3, password_for_site_v3, identicon, min_buffer_len,
+    encrypt, decrypt};
 use clear_on_drop::ClearOnDrop;
 use config::{merge_options, Config, SiteConfig, Site};
 
@@ -118,7 +121,7 @@ fn main() {
              .long("name")
              .short("u")
              .help("The full name of the user.\nOptional if given in config.")
-             .required_unless("config")
+             .required_unless_one(&["config", "generate name"])
              .number_of_values(1)
              .takes_value(true))
         .arg(Arg::with_name("type")
@@ -202,6 +205,13 @@ fn main() {
              .help("Encrypt and store a password")
              .requires_all(&["site", "config"])
              .conflicts_with_all(&["add", "delete", "replace"]))
+        .arg(Arg::with_name("generate name")
+            .long("generate-name")
+            .short("g")
+            .help("Generate a random full name.\n\
+                   If the name is kept secret, this is more secure.")
+            .requires("config")
+            .conflicts_with("full name"))
         .get_matches();
 
     // If given, read config from path.
@@ -228,7 +238,15 @@ fn main() {
 
     // Read config from CLI parameters.
     let mut param_config = Config::new();
-    param_config.full_name = matches.value_of("full name").map(Into::into);
+    let rng = SystemRandom::new();
+    param_config.full_name = if matches.is_present("generate name") {
+        let name: String = random_password_for_site(&rng, SiteType::GeneratedMaximum)
+            .unwrap_or_exit("failed to generate random full name").clone();
+        println!("generated random full name: \"{}\"", name);
+        Some(name.into())
+    } else {
+        matches.value_of("full name").map(Into::into)
+    };
     let param_site_name = matches.value_of("site");
     if let Some(name) = param_site_name {
         let param_site_config = SiteConfig {
@@ -263,7 +281,7 @@ fn main() {
         (config.full_name.as_ref(), param_config.full_name.as_ref())
     {
         if config_name != param_name {
-           exit("full name given as paramater conflicts with config");
+           exit("full name given as parameter conflicts with config");
         }
     }
     if matches.is_present("store") {

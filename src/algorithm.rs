@@ -1,6 +1,7 @@
 //! This implements the Maser Password algorithm.
 //! See http://masterpasswordapp.com/algorithm.html.
 
+extern crate conv;
 extern crate ring;
 extern crate ring_pwhash;
 extern crate data_encoding;
@@ -14,9 +15,11 @@ use std::error::Error as StdError;
 use std::fmt;
 
 use self::ring::{aead, digest, hmac, rand};
+use self::ring::rand::SystemRandom;
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
 use self::data_encoding::hex;
 use self::byteorder::{BigEndian, WriteBytesExt};
+use self::conv::ValueInto;
 
 use clear_on_drop::ClearOnDrop;
 
@@ -271,20 +274,34 @@ pub fn password_for_site_v3(master_key: &[u8; 64], site_name: &[u8], site_type: 
     let site_password_seed = digest.as_ref();
     debug_assert!(!site_password_seed.is_empty());
 
-    let template = template_for_type(site_type, site_password_seed[0]);
-    if template.len() > 32 {
-        panic!("template too long for password seed");
-    }
-
     // Encode the password from the seed using the template.
-    let mut site_password = ClearOnDrop::new(String::new());
+    let site_password = generate_password(site_type, &site_password_seed);
+
+    Ok(site_password)
+}
+
+/// Generate a password for the given site type from a given seed.
+fn generate_password(site_type: SiteType, seed: &[u8]) -> ClearOnDrop<String> {
+    let template = template_for_type(site_type, seed[0]);
+    if template.len() >= seed.len() {
+        panic!(format!("template too long for given password seed: {} >= {}",
+                       template.len(), seed.len()));
+    }
+    let mut password = ClearOnDrop::new(String::with_capacity(template.len()));
     for (i, c) in template.chars().enumerate() {
-        site_password.push(
-            character_from_class(c, site_password_seed[i + 1])
+        password.push(
+            character_from_class(c, seed[i + 1])
         );
     }
 
-    Ok(site_password)
+    password
+}
+
+/// Generate a random password for the given site type.
+pub fn random_password_for_site(rng: &SystemRandom, site_type: SiteType) -> Result<ClearOnDrop<String>, ()> {
+    let mut seed = ClearOnDrop::new(vec![0; 21]);
+    rng.fill(seed.as_mut()).map_err(|_| ())?;
+    Ok(generate_password(site_type, &seed))
 }
 
 /// Return an array of internal strings that express the template to use for the given type.
@@ -358,6 +375,17 @@ fn characters_in_class(class: char) -> &'static str {
         ' ' => " ",
         _ => panic!("Unknown character class"),
     }
+}
+
+/// Calculate the bits of entropy of a given template.
+fn entropy_of_template(template: &str) -> f64 {
+    let mut bits = 0.;
+    for class in template.chars() {
+        let possibilities: f64 = characters_in_class(class).len().value_into()
+            .expect("failed to convert `usize` to `f64`");
+        bits += possibilities.log2();
+    }
+    bits
 }
 
 /// Return a character from given character class that encodes the given byte.
@@ -517,6 +545,30 @@ fn test_key_for_user_v3() {
         232
     ];
     assert_eq!(&master_key[..], &expected_master_key[..]);
+}
+
+#[test]
+fn test_template_entropy() {
+    use SiteType::*;
+
+    /// Calculate minimal bits of entropy.
+    // TODO: Figure out how to calculate actual entropy
+    fn bits(ty: SiteType) -> f64 {
+        let mut min = ::std::f64::INFINITY;
+        for t in &templates_for_type(ty) {
+            min = entropy_of_template(*t).min(min);
+        }
+        min
+    }
+
+    assert!(bits(GeneratedMaximum) > 118.4);
+    assert!(bits(GeneratedLong) > 48.1);
+    assert!(bits(GeneratedMedium) > 30.1);
+    assert!(bits(GeneratedBasic) > 38.4);
+    assert!(bits(GeneratedShort) > 14.4);
+    assert!(bits(GeneratedPIN) > 13.2);
+    assert!(bits(GeneratedName) > 31.2);
+    assert!(bits(GeneratedPhrase) > 55.7);
 }
 
 #[test]

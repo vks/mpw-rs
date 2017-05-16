@@ -15,7 +15,7 @@ use std::error::Error as StdError;
 use std::fmt;
 
 use self::ring::{aead, digest, hmac, rand};
-use self::ring::rand::SystemRandom;
+use self::ring::rand::{SecureRandom, SystemRandom};
 use self::ring_pwhash::scrypt::{scrypt, ScryptParams};
 use self::data_encoding::hex;
 use self::byteorder::{BigEndian, WriteBytesExt};

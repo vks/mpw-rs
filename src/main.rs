@@ -10,6 +10,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate data_encoding;
+extern crate zxcvbn;
 
 use std::io::{Read, Write};
 use std::fs::File;
@@ -18,6 +19,7 @@ use clap::{Arg, App, AppSettings};
 use ring::rand::SystemRandom;
 use rpassword::read_password;
 use data_encoding::base64;
+use zxcvbn::zxcvbn;
 
 mod algorithm;
 mod clear_on_drop;
@@ -55,6 +57,24 @@ fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
 
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
+    if let Some(evaluation) = zxcvbn(&master_password, Some(&[full_name])) {
+        let time = &evaluation.crack_times_display.offline_slow_hashing_1e4_per_second;
+        match evaluation.score {
+            0 => println!("Your password is trivial, it can be cracked in {}.", time),
+            1 => println!("Your password is very weak, it can be cracked in {}.", time),
+            2 => println!("Your password is weak, it can be cracked in {}.", time),
+            3 => println!("Your password is so-so."),
+            _ => println!("Your password is great!"),
+        }
+        if let Some(feedback) = evaluation.feedback {
+            if let Some(warning) = feedback.warning {
+                println!("{}", warning);
+            }
+            for s in &feedback.suggestions {
+                println!("{}", s);
+            }
+        }
+    }
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),
         master_password.as_bytes()
@@ -343,6 +363,7 @@ fn main() {
     };
 
     // Generate or decrypt passwords.
+    println!();
     for site_config in site_configs {
         let site = Site::from_config(site_config).unwrap_or_else(|e| exit(&e.message));
         // If a site was given, skip all other sites.

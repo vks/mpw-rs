@@ -20,10 +20,13 @@ rpassword = "0.4"
 serde = "1"
 serde_derive = "1"
 toml = "0.4"
+zxcvbn = "0.5"
 
 [dependencies.clap]
 features = ["unstable", "color"]
 version = "2.11.2"
 
+[profile]
+
 [profile.dev]
-opt-level = 2  # otherwise the tests run for too long
+opt-level = 2

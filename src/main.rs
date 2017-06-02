@@ -74,6 +74,10 @@ fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
                 println!("{}", s);
             }
         }
+    } else if master_password.is_empty() {
+        println!("Your password is empty, it can be cracked in less than a second.");
+    } else {
+        println!("Could not evaluate password, most likely because of non-ASCII symbols.");
     }
     let master_key = master_key_for_user_v3(
         full_name.as_bytes(),

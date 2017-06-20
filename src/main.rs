@@ -57,7 +57,7 @@ fn generate_master_key(full_name: &str) -> ClearOnDrop<[u8; 64]> {
 
     let identicon = identicon(full_name.as_bytes(), master_password.as_bytes());
     println!("Identicon: {}", identicon);
-    if let Some(evaluation) = zxcvbn(&master_password, Some(&[full_name])) {
+    if let Ok(evaluation) = zxcvbn(&master_password, &[full_name]) {
         let time = &evaluation.crack_times_display.offline_slow_hashing_1e4_per_second;
         match evaluation.score {
             0 => println!("Your password is trivial, it can be cracked in {}.", time),
